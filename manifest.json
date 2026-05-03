@@ -1,0 +1,10 @@
+{
+  "id": "stonegate",
+  "name": "StoneGate",
+  "version": "2.0.0",
+  "minAppVersion": "1.4.0",
+  "description": "Lock screen protection for your vault",
+  "author": "StoneGate Author",
+  "authorUrl": "",
+  "isDesktopOnly": false
+}
