@@ -1,0 +1,222 @@
+/* StoneGate Plugin Styles */
+.sg-overlay-container {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    background-color: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    pointer-events: all;
+    opacity: 1;
+}
+
+.sg-overlay-hidden {
+    display: none !important;
+}
+
+.sg-overlay-fade-out {
+    animation: sg-fadeout 0.3s ease-out forwards;
+}
+
+.sg-overlay-fade-in {
+    animation: sg-fadein 0.3s ease-in forwards;
+}
+
+.sg-overlay-card {
+    background-color: var(--background-secondary, #2d2d2d);
+    border: 1px solid var(--background-modifier-border, #444);
+    border-radius: var(--radius-l, 8px);
+    padding: var(--size-4-8, 32px);
+    width: 100%;
+    max-width: 360px;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+    text-align: center;
+}
+
+.sg-app-name {
+    font-size: 0.9em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    opacity: 0.8;
+}
+
+.sg-title {
+    font-size: 1.5em;
+    font-weight: bold;
+    color: var(--text-normal, #ddd);
+    margin-bottom: var(--size-4-4, 16px);
+    margin-top: 0;
+}
+
+.sg-input-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    width: 100%;
+    margin-bottom: var(--size-4-4, 16px);
+}
+
+.sg-input {
+    width: 100%;
+    padding: 12px 52px 12px 12px; /* Increased vertical padding */
+    box-sizing: border-box;
+}
+
+.sg-input.sg-shake {
+    animation: sg-shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+    border-color: #e05555;
+}
+
+.sg-eye-toggle {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    box-shadow: none;
+}
+
+.sg-eye-toggle:hover {
+    background: transparent;
+}
+
+.sg-eye-toggle svg {
+    width: 16px;
+    height: 16px;
+    flex-shrink: 0;
+    stroke: var(--text-muted, #888);
+    stroke-width: 2;
+    fill: none;
+}
+
+.sg-submit-btn {
+    width: 100%;
+}
+
+.sg-error {
+    color: #e05555;
+    font-size: var(--font-ui-small, 12px);
+    margin-top: 4px;
+    text-align: left;
+}
+
+.sg-counter {
+    margin-top: 12px;
+    font-size: var(--font-ui-small, 12px);
+    color: var(--text-muted, #888);
+}
+
+.sg-lockout {
+    color: #e05555;
+    font-weight: bold;
+    animation: sg-pulse 2s infinite;
+}
+
+.sg-autocomplete-dropdown {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--background-secondary);
+    border: 1px solid var(--background-modifier-border);
+    border-radius: var(--radius-s);
+    z-index: 9999;
+    max-height: 200px;
+    overflow-y: auto;
+    margin-top: 4px;
+    box-shadow: var(--shadow-m);
+}
+
+.sg-autocomplete-item {
+    padding: 6px 12px;
+    cursor: pointer;
+    color: var(--text-normal);
+}
+
+.sg-autocomplete-item:hover {
+    background: var(--background-modifier-hover);
+}
+
+@keyframes sg-shake {
+    10%, 90% { transform: translate3d(-1px, 0, 0); }
+    20%, 80% { transform: translate3d(2px, 0, 0); }
+    30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+    40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+
+@keyframes sg-fadein {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes sg-fadeout {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes sg-pulse {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
+
+/* Modals extra styling */
+.sg-modal-input-container {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    width: 100%;
+    margin-bottom: 20px;
+}
+
+.sg-modal-input-container label {
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-muted);
+}
+
+.sg-modal-input-container input {
+    width: 100%;
+    padding: 10px 52px 10px 10px; /* Increased padding */
+    box-sizing: border-box;
+}
+
+.sg-hint {
+    color: var(--text-muted, #888);
+    font-size: var(--font-ui-small, 12px);
+    margin-top: 4px;
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.sg-back-btn {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--text-muted, #888);
+    cursor: pointer;
+    margin-top: 16px;
+    font-size: var(--font-ui-small, 12px);
+    width: 100%;
+}
+
+.sg-back-btn:hover {
+    color: var(--text-normal, #ddd);
+    text-decoration: underline;
+    background: transparent;
+}
