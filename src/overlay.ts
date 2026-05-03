@@ -16,7 +16,6 @@ export class LockOverlay {
   private appNameEl: HTMLElement | null = null;
   private titleEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
-  private backBtnEl: HTMLButtonElement | null = null;
 
   private currentCallback: UnlockCallback | null = null;
   private currentPath: ProtectedPath | null = null;
@@ -73,29 +72,11 @@ export class LockOverlay {
       cls: "mod-cta sg-submit-btn"
     });
 
-    this.backBtnEl = card.createEl("button", {
-      text: "← Back",
-      cls: "sg-back-btn"
-    });
-
     this.errorEl = card.createDiv("sg-error");
     this.counterEl = card.createDiv("sg-counter");
     this.lockoutEl = card.createDiv("sg-lockout");
 
     this.submitBtnEl.addEventListener("click", () => this.submit());
-    
-    this.backBtnEl.addEventListener("click", () => {
-      this.hide();
-      if (this.previousFile) {
-        this.app.workspace.openLinkText(this.previousFile, "");
-      } else {
-        const leaf = this.app.workspace.getLeaf(false);
-        if (leaf) {
-          leaf.setViewState({ type: "empty", state: {} });
-        }
-      }
-      if (this.currentCallback) this.currentCallback(false);
-    });
 
     document.body.appendChild(this.containerEl);
 
@@ -159,14 +140,6 @@ export class LockOverlay {
         hintText = `Hint: ${this.settings.passwordHint}`;
     }
     this.hintEl!.textContent = hintText;
-
-    // Hide back button for entire vault or when there's no previous file (startup)
-    const isEntireVault = path.path === "/" || path.id === "default" || path.path === "";
-    if (isEntireVault || !previousFile) {
-      this.backBtnEl!.style.display = "none";
-    } else {
-      this.backBtnEl!.style.display = "block";
-    }
 
     this.containerEl.removeClass("sg-overlay-hidden");
     this.containerEl.removeClass("sg-overlay-fade-out");
