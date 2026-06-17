@@ -597,27 +597,48 @@ var LockOverlay = class {
   handleKeydown(e) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden"))
       return;
+    const isRecoveryModalOpen = !!document.querySelector(".sg-recovery-modal-container");
     const recoveryModal = document.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal == null ? void 0 : recoveryModal.querySelector("input");
-    if (recoveryInput && document.activeElement === recoveryInput) {
-      if (e.key !== "Enter") {
-        e.stopPropagation();
+    const activeEl = typeof activeDocument !== "undefined" && activeDocument ? activeDocument.activeElement : document.activeElement;
+    const isFocusOnOurInput = activeEl === this.inputEl || recoveryInput && activeEl === recoveryInput;
+    const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
+    if (hasModifier) {
+      const keyLower = e.key.toLowerCase();
+      const isEditingShortcut = ["a", "c", "v", "x", "z", "y"].includes(keyLower);
+      if (isFocusOnOurInput && isEditingShortcut) {
+        return;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
+    if (!isFocusOnOurInput) {
+      e.stopPropagation();
+      e.preventDefault();
+      if (isRecoveryModalOpen && recoveryInput) {
+        recoveryInput.focus();
+      } else if (this.inputEl) {
+        const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+        if (!isLockedOut) {
+          this.inputEl.focus();
+        }
       }
       return;
     }
-    e.stopPropagation();
-    if (e.key === "Escape") {
-      e.preventDefault();
-      return;
-    }
     if (e.key === "Enter") {
+      e.stopPropagation();
       e.preventDefault();
+      if (isRecoveryModalOpen) {
+        return;
+      }
       this.submit();
       return;
     }
-    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
-    if (!isLockedOut && this.inputEl && document.activeElement !== this.inputEl) {
-      this.inputEl.focus();
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      e.preventDefault();
+      return;
     }
   }
   show(path, previousFile, callback) {
@@ -646,7 +667,7 @@ var LockOverlay = class {
     const workspace = document.body.querySelector(".workspace");
     if (workspace)
       workspace.setCssStyles({ pointerEvents: "none" });
-    document.addEventListener("keydown", this.boundHandleKeydown, true);
+    window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
     if (this.app.workspace.layoutReady) {
       this.applyBackgroundStyles();
     } else {
@@ -683,7 +704,7 @@ var LockOverlay = class {
       const workspace = document.body.querySelector(".workspace");
       if (workspace)
         workspace.setCssStyles({ pointerEvents: "" });
-      document.removeEventListener("keydown", this.boundHandleKeydown, true);
+      window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
     }, 300);
   }
   async handleSuccessfulUnlock() {
@@ -815,7 +836,7 @@ var LockOverlay = class {
     if (this.lockoutTimer !== null) {
       window.clearInterval(this.lockoutTimer);
     }
-    document.removeEventListener("keydown", this.boundHandleKeydown, true);
+    window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.parentNode.removeChild(this.containerEl);
     }

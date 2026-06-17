@@ -211,33 +211,59 @@ export class LockOverlay {
   private handleKeydown(e: KeyboardEvent) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden")) return;
     
+    const isRecoveryModalOpen = !!document.querySelector(".sg-recovery-modal-container");
     const recoveryModal = document.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal?.querySelector("input") as HTMLInputElement;
-    if (recoveryInput && document.activeElement === recoveryInput) {
-      if (e.key !== "Enter") {
-        e.stopPropagation();
+
+    const activeEl = (typeof activeDocument !== "undefined" && activeDocument) ? activeDocument.activeElement : document.activeElement;
+    const isFocusOnOurInput = (activeEl === this.inputEl) || (recoveryInput && activeEl === recoveryInput);
+
+    const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
+    
+    if (hasModifier) {
+      // Allow standard editing shortcuts inside the input field:
+      // Ctrl/Cmd + A, C, V, X, Z, Y
+      const keyLower = e.key.toLowerCase();
+      const isEditingShortcut = ["a", "c", "v", "x", "z", "y"].includes(keyLower);
+      
+      if (isFocusOnOurInput && isEditingShortcut) {
+        return;
+      }
+      
+      e.stopPropagation();
+      e.preventDefault();
+      return;
+    }
+
+    if (!isFocusOnOurInput) {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      if (isRecoveryModalOpen && recoveryInput) {
+        recoveryInput.focus();
+      } else if (this.inputEl) {
+        const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+        if (!isLockedOut) {
+          this.inputEl.focus();
+        }
       }
       return;
     }
 
-    // Stop all key events from propagating to obsidian workspace
-    e.stopPropagation();
-    
-    if (e.key === "Escape") {
-      e.preventDefault();
-      return;
-    }
-
     if (e.key === "Enter") {
+      e.stopPropagation();
       e.preventDefault();
+      if (isRecoveryModalOpen) {
+        return;
+      }
       this.submit();
       return;
     }
 
-    // Force focus to input if user starts typing (but not during lockout)
-    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
-    if (!isLockedOut && this.inputEl && document.activeElement !== this.inputEl) {
-      this.inputEl.focus();
+    if (e.key === "Escape") {
+      e.stopPropagation();
+      e.preventDefault();
+      return;
     }
   }
 
@@ -274,7 +300,7 @@ export class LockOverlay {
     if (workspace) workspace.setCssStyles({ pointerEvents: "none" });
 
     // Block keyboard events
-    document.addEventListener("keydown", this.boundHandleKeydown, true);
+    window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
 
     // Hook into Obsidian layout lifecycle
     if (this.app.workspace.layoutReady) {
@@ -314,7 +340,7 @@ export class LockOverlay {
       }
       const workspace = document.body.querySelector(".workspace") as HTMLElement;
       if (workspace) workspace.setCssStyles({ pointerEvents: "" });
-      document.removeEventListener("keydown", this.boundHandleKeydown, true);
+      window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
     }, 300); // match animation duration
   }
 
@@ -461,7 +487,7 @@ export class LockOverlay {
     if (this.lockoutTimer !== null) {
       window.clearInterval(this.lockoutTimer);
     }
-    document.removeEventListener("keydown", this.boundHandleKeydown, true);
+    window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.parentNode.removeChild(this.containerEl);
     }
