@@ -9,6 +9,7 @@ export interface ProtectedPath {
   passwordHint?: string;
   showHint: boolean;
   enableGhostMode?: boolean;
+  showInUnlockMenu?: boolean;
 }
 
 export interface StoneGateSettings {

@@ -12,8 +12,11 @@ export class UnlockPathModal extends FuzzySuggestModal<ProtectedPath> {
   }
 
   getItems(): ProtectedPath[] {
-    // Return only paths that are currently locked
-    return this.plugin.settings.protectedPaths.filter(p => this.plugin.lockManager.isLocked(p.path));
+    // Return only paths that are currently locked and either Ghosted or marked for the menu
+    return this.plugin.settings.protectedPaths.filter(p => 
+      this.plugin.lockManager.isLocked(p.path) && 
+      (p.enableGhostMode === true || p.showInUnlockMenu === true)
+    );
   }
 
   getItemText(item: ProtectedPath): string {

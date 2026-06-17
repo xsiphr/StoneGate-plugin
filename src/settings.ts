@@ -798,6 +798,29 @@ class AddPathModal extends Modal {
     ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
 
+    // Show in Unlock Menu toggle
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    menuWrapper.style.display = "flex";
+    menuWrapper.style.flexDirection = "row";
+    menuWrapper.style.alignItems = "center";
+    menuWrapper.style.justifyContent = "flex-start";
+    menuWrapper.style.gap = "8px";
+    menuWrapper.style.marginBottom = "16px";
+    const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
+    menuToggle.style.flexShrink = "0";
+    const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
+    menuLabel.style.cursor = "pointer";
+    menuLabel.addEventListener("click", () => menuToggle.click());
+
+    // Description text for the new toggle
+    const menuDesc = contentEl.createEl("p", {
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+    });
+    menuDesc.style.fontSize = "0.85em";
+    menuDesc.style.color = "var(--text-muted)";
+    menuDesc.style.marginTop = "-12px";
+    menuDesc.style.marginBottom = "16px";
+
     // Set path password
     let tempHash: string | undefined = undefined;
     let tempSalt: string | undefined = undefined;
@@ -848,7 +871,8 @@ class AddPathModal extends Modal {
         passwordSalt: tempSalt,
         passwordHint: hintInput.value.trim() || undefined,
         showHint: showHintToggle.checked,
-        enableGhostMode: ghostToggle.checked
+        enableGhostMode: ghostToggle.checked,
+        showInUnlockMenu: menuToggle.checked
       });
       
       await this.plugin.saveSettings();
@@ -953,6 +977,30 @@ class EditPathModal extends Modal {
     ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
 
+    // Show in Unlock Menu toggle
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    menuWrapper.style.display = "flex";
+    menuWrapper.style.flexDirection = "row";
+    menuWrapper.style.alignItems = "center";
+    menuWrapper.style.justifyContent = "flex-start";
+    menuWrapper.style.gap = "8px";
+    menuWrapper.style.marginBottom = "16px";
+    const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
+    menuToggle.style.flexShrink = "0";
+    menuToggle.checked = !!this.pathObj.showInUnlockMenu;
+    const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
+    menuLabel.style.cursor = "pointer";
+    menuLabel.addEventListener("click", () => menuToggle.click());
+
+    // Description text for the new toggle
+    const menuDesc = contentEl.createEl("p", {
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+    });
+    menuDesc.style.fontSize = "0.85em";
+    menuDesc.style.color = "var(--text-muted)";
+    menuDesc.style.marginTop = "-12px";
+    menuDesc.style.marginBottom = "16px";
+
     const pwdControls = contentEl.createDiv();
     pwdControls.style.display = "flex";
     pwdControls.style.gap = "8px";
@@ -1011,6 +1059,7 @@ class EditPathModal extends Modal {
       this.pathObj.passwordHint = hintInput.value.trim() || undefined;
       this.pathObj.showHint = showHintToggle.checked;
       this.pathObj.enableGhostMode = ghostToggle.checked;
+      this.pathObj.showInUnlockMenu = menuToggle.checked;
       
       await this.plugin.saveSettings();
       this.plugin.lockManager.updateGhostModeStyles();
