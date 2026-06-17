@@ -493,16 +493,18 @@ export class PasswordModal extends Modal {
     const confirmPasswordInput = createInputWithEye(contentEl, "Confirm Password");
     const errorEl = contentEl.createDiv("sg-error");
 
-    const submitBtn = contentEl.createEl("button", { text: "Save", cls: "mod-cta" });
-    submitBtn.style.marginTop = "16px";
+    const submitBtn = contentEl.createEl("button", { text: "Save", cls: "mod-cta sg-modal-submit-btn" });
 
     const submit = async () => {
       errorEl.textContent = "";
+      if (currentInput) {
+        currentInput.setCssStyles({ borderColor: "" });
+      }
       if (currentInput && this.targetHash && this.targetSalt) {
         const isMatch = await verifyPassword(currentInput.value, this.targetHash, this.targetSalt);
         if (!isMatch) {
           errorEl.textContent = "Current password is incorrect.";
-          currentInput.style.borderColor = "#e05555";
+          currentInput.setCssStyles({ borderColor: "#e05555" });
           return;
         }
       }
@@ -583,11 +585,11 @@ export class ConfirmPasswordModal extends Modal {
 
     const errorEl = contentEl.createDiv("sg-error");
 
-    const submitBtn = contentEl.createEl("button", { text: "Confirm", cls: "mod-cta" });
-    submitBtn.style.marginTop = "16px";
+    const submitBtn = contentEl.createEl("button", { text: "Confirm", cls: "mod-cta sg-modal-submit-btn" });
 
     const submit = async () => {
       errorEl.textContent = "";
+      input.setCssStyles({ borderColor: "" });
       const hash = this.targetHash || this.plugin.settings.passwordHash;
       const salt = this.targetSalt || this.plugin.settings.passwordSalt;
       if (!hash || !salt) {
@@ -602,7 +604,7 @@ export class ConfirmPasswordModal extends Modal {
         this.close();
       } else {
         errorEl.textContent = "Incorrect password.";
-        input.style.borderColor = "#e05555";
+        input.setCssStyles({ borderColor: "#e05555" });
       }
     };
 
@@ -640,45 +642,22 @@ export class RecoveryCodeDisplayModal extends Modal {
       text: "This recovery code acts as a Global Skeleton Key. It can bypass and unlock any locked folder or the vault itself if you forget your password.",
       cls: "sg-modal-desc"
     });
-    desc.style.marginBottom = "16px";
+    desc.addClass("sg-display-desc");
 
-    const warningBox = contentEl.createDiv("sg-warning-box");
-    warningBox.style.border = "1px solid var(--text-error)";
-    warningBox.style.backgroundColor = "rgba(255, 0, 0, 0.05)";
-    warningBox.style.padding = "12px 16px";
-    warningBox.style.borderRadius = "6px";
-    warningBox.style.marginBottom = "20px";
+    const warningBox = contentEl.createDiv("sg-warning-box sg-display-warning-box");
     
-    const warningTitle = warningBox.createEl("strong", { text: "⚠️ IMPORTANT WARNING:" });
-    warningTitle.style.color = "var(--text-error)";
-    warningTitle.style.display = "block";
-    warningTitle.style.marginBottom = "6px";
+    const warningTitle = warningBox.createEl("strong", { text: "⚠️ IMPORTANT WARNING:", cls: "sg-display-warning-title" });
 
     const warningText = warningBox.createEl("span", {
-      text: "Write this code down or save it in a secure password manager. For security reasons, the code is hashed before saving, and it CANNOT be shown or recovered again once you close this window."
+      text: "Write this code down or save it in a secure password manager. For security reasons, the code is hashed before saving, and it CANNOT be shown or recovered again once you close this window.",
+      cls: "sg-display-warning-text"
     });
-    warningText.style.fontSize = "0.9em";
 
-    const codeContainer = contentEl.createDiv("sg-recovery-code-container");
-    codeContainer.style.textAlign = "center";
-    codeContainer.style.margin = "24px 0";
-    codeContainer.style.padding = "16px";
-    codeContainer.style.borderRadius = "8px";
-    codeContainer.style.backgroundColor = "var(--background-secondary-alt)";
-    codeContainer.style.border = "2px dashed var(--interactive-accent)";
+    const codeContainer = contentEl.createDiv("sg-recovery-code-container sg-display-code-container");
 
-    const codeEl = codeContainer.createEl("div", { text: this.code });
-    codeEl.style.fontSize = "2.4em";
-    codeEl.style.fontWeight = "bold";
-    codeEl.style.letterSpacing = "6px";
-    codeEl.style.color = "var(--interactive-accent)";
-    codeEl.style.fontFamily = "monospace";
-    codeEl.style.userSelect = "all";
+    const codeEl = codeContainer.createEl("div", { text: this.code, cls: "sg-display-code-el" });
 
-    const buttonRow = contentEl.createDiv("sg-button-row");
-    buttonRow.style.display = "flex";
-    buttonRow.style.justifyContent = "space-between";
-    buttonRow.style.marginTop = "24px";
+    const buttonRow = contentEl.createDiv("sg-button-row sg-display-button-row");
 
     const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
     copyBtn.addEventListener("click", async () => {
@@ -715,15 +694,13 @@ class AddPathModal extends Modal {
     contentEl.createEl("h2", { text: "Add Protected Path" });
 
     // Path Input with Autocomplete
-    const pathWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    pathWrapper.createEl("label", { text: "Folder path (e.g. Secret/ or / for entire vault)" }).style.display = "block";
-    pathWrapper.style.marginBottom = "8px";
+    const pathWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    pathWrapper.createEl("label", { text: "Folder path (e.g. Secret/ or / for entire vault)" });
     
     const pathInput = pathWrapper.createEl("input", { type: "text", attr: { placeholder: "Path..." } });
-    pathInput.style.width = "100%";
     
     const dropdown = pathWrapper.createDiv("sg-autocomplete-dropdown");
-    dropdown.style.display = "none";
+    dropdown.hide();
 
     const folders = this.app.vault.getAllFolders().map(f => f.path);
     folders.unshift("/"); // Allow matching root
@@ -734,82 +711,53 @@ class AddPathModal extends Modal {
       const matches = folders.filter(f => f.toLowerCase().includes(query)).slice(0, 8);
       
       if (matches.length > 0 && query.length > 0) {
-        dropdown.style.display = "block";
+        dropdown.show();
         for (const match of matches) {
           const item = dropdown.createDiv({ cls: "sg-autocomplete-item", text: match === "/" ? "Vault (/)" : match });
           item.addEventListener("click", () => {
             pathInput.value = match;
-            dropdown.style.display = "none";
+            dropdown.hide();
           });
         }
       } else {
-        dropdown.style.display = "none";
+        dropdown.hide();
       }
     };
 
     pathInput.addEventListener("input", updateDropdown);
 
     // Label Input
-    const labelWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    labelWrapper.createEl("label", { text: "Friendly Label (optional)" }).style.display = "block";
-    labelWrapper.style.marginBottom = "8px";
+    const labelWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    labelWrapper.createEl("label", { text: "Friendly Label (optional)" });
     const labelInput = labelWrapper.createEl("input", { type: "text", attr: { placeholder: "My Secrets" } });
-    labelInput.style.width = "100%";
 
     // Timeout Input
-    const timeoutWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    timeoutWrapper.createEl("label", { text: "Timeout in Minutes (decimals allowed, e.g., 0.5 = 30s)" }).style.display = "block";
-    timeoutWrapper.style.marginBottom = "8px";
+    const timeoutWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    timeoutWrapper.createEl("label", { text: "Timeout in Minutes (decimals allowed, e.g., 0.5 = 30s)" });
     const timeoutInput = timeoutWrapper.createEl("input", { type: "number", attr: { placeholder: "Minutes (e.g. 0.5 = 30s, 3 = 3min)", step: "any" } });
-    timeoutInput.style.width = "100%";
     timeoutInput.value = "3";
 
     // Hint Input
-    const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    hintWrapper.createEl("label", { text: "Password Hint (optional)" }).style.display = "block";
-    hintWrapper.style.marginBottom = "8px";
+    const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    hintWrapper.createEl("label", { text: "Password Hint (optional)" });
     const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint or custom message..." } });
-    hintInput.style.width = "100%";
 
     // Show hint toggle
-    const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    toggleWrapper.style.display = "flex";
-    toggleWrapper.style.flexDirection = "row";
-    toggleWrapper.style.alignItems = "center";
-    toggleWrapper.style.justifyContent = "flex-start";
-    toggleWrapper.style.gap = "8px";
-    toggleWrapper.style.marginBottom = "16px";
+    const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const showHintToggle = toggleWrapper.createEl("input", { type: "checkbox" });
     const showHintLabel = toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
-    showHintLabel.style.cursor = "pointer";
     showHintLabel.addEventListener("click", () => showHintToggle.click());
 
     // Ghost mode toggle
-    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    ghostWrapper.style.display = "flex";
-    ghostWrapper.style.flexDirection = "row";
-    ghostWrapper.style.alignItems = "center";
-    ghostWrapper.style.justifyContent = "flex-start";
-    ghostWrapper.style.gap = "8px";
-    ghostWrapper.style.marginBottom = "16px";
+    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const ghostToggle = ghostWrapper.createEl("input", { type: "checkbox" });
-    ghostToggle.style.flexShrink = "0";
     const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
-    ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
 
     // Show in Unlock Menu toggle
-    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    menuWrapper.style.display = "flex";
-    menuWrapper.style.flexDirection = "row";
-    menuWrapper.style.alignItems = "center";
-    menuWrapper.style.justifyContent = "flex-start";
-    menuWrapper.style.gap = "8px";
-    menuWrapper.style.marginBottom = "16px";
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
-    menuToggle.style.flexShrink = "0";
     const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
-    menuLabel.style.cursor = "pointer";
     menuLabel.addEventListener("click", () => {
       if (!menuToggle.disabled) {
         menuToggle.click();
@@ -818,12 +766,9 @@ class AddPathModal extends Modal {
 
     // Description text for the new toggle
     const menuDesc = contentEl.createEl("p", {
-      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed.",
+      cls: "sg-modal-desc-small"
     });
-    menuDesc.style.fontSize = "0.85em";
-    menuDesc.style.color = "var(--text-muted)";
-    menuDesc.style.marginTop = "-12px";
-    menuDesc.style.marginBottom = "16px";
 
     // Enforce dependency logic
     ghostToggle.addEventListener("change", () => {
@@ -838,8 +783,7 @@ class AddPathModal extends Modal {
     // Set path password
     let tempHash: string | undefined = undefined;
     let tempSalt: string | undefined = undefined;
-    const pwdBtn = contentEl.createEl("button", { text: "Set Password for this path (optional)" });
-    pwdBtn.style.marginBottom = "16px";
+    const pwdBtn = contentEl.createEl("button", { text: "Set Password for this path (optional)", cls: "sg-path-password-btn" });
     pwdBtn.addEventListener("click", () => {
       new PasswordModal(this.app, this.plugin, undefined, undefined, "Path Password", (success, hash, salt) => {
         if (success && hash && salt) {
@@ -852,8 +796,7 @@ class AddPathModal extends Modal {
 
     const errorEl = contentEl.createDiv("sg-error");
 
-    const submitBtn = contentEl.createEl("button", { text: "Add", cls: "mod-cta" });
-    submitBtn.style.marginTop = "16px";
+    const submitBtn = contentEl.createEl("button", { text: "Add", cls: "mod-cta sg-modal-submit-btn" });
 
     const submit = async () => {
       errorEl.textContent = "";
@@ -908,7 +851,7 @@ class AddPathModal extends Modal {
     // Close dropdown when clicking outside
     document.addEventListener("click", (e) => {
       if (!pathWrapper.contains(e.target as Node)) {
-        dropdown.style.display = "none";
+        dropdown.hide();
       }
     });
 
@@ -939,71 +882,42 @@ class EditPathModal extends Modal {
     contentEl.createEl("p", { text: `Path: ${this.pathObj.path === "/" ? "Vault (/)" : this.pathObj.path}` });
 
     // Label Input
-    const labelWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    labelWrapper.createEl("label", { text: "Friendly Label" }).style.display = "block";
-    labelWrapper.style.marginBottom = "8px";
+    const labelWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    labelWrapper.createEl("label", { text: "Friendly Label" });
     const labelInput = labelWrapper.createEl("input", { type: "text", attr: { placeholder: "Label" } });
-    labelInput.style.width = "100%";
     labelInput.value = this.pathObj.label || "";
 
     // Timeout Input
-    const timeoutWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    timeoutWrapper.createEl("label", { text: "Timeout in Minutes (decimals allowed, e.g., 0.5 = 30s)" }).style.display = "block";
-    timeoutWrapper.style.marginBottom = "8px";
+    const timeoutWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    timeoutWrapper.createEl("label", { text: "Timeout in Minutes (decimals allowed, e.g., 0.5 = 30s)" });
     const timeoutInput = timeoutWrapper.createEl("input", { type: "number", attr: { placeholder: "Minutes", step: "any" } });
-    timeoutInput.style.width = "100%";
     timeoutInput.value = String(this.pathObj.timeoutMinutes);
 
     // Hint Input
-    const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    hintWrapper.createEl("label", { text: "Password Hint" }).style.display = "block";
-    hintWrapper.style.marginBottom = "8px";
+    const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-small-margin" });
+    hintWrapper.createEl("label", { text: "Password Hint" });
     const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint or custom message..." } });
-    hintInput.style.width = "100%";
     hintInput.value = this.pathObj.passwordHint || "";
 
     // Show hint toggle
-    const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    toggleWrapper.style.display = "flex";
-    toggleWrapper.style.flexDirection = "row";
-    toggleWrapper.style.alignItems = "center";
-    toggleWrapper.style.justifyContent = "flex-start";
-    toggleWrapper.style.gap = "8px";
-    toggleWrapper.style.marginBottom = "16px";
+    const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const showHintToggle = toggleWrapper.createEl("input", { type: "checkbox" });
     showHintToggle.checked = this.pathObj.showHint;
     const showHintLabel = toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
-    showHintLabel.style.cursor = "pointer";
     showHintLabel.addEventListener("click", () => showHintToggle.click());
 
     // Ghost mode toggle
-    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    ghostWrapper.style.display = "flex";
-    ghostWrapper.style.flexDirection = "row";
-    ghostWrapper.style.alignItems = "center";
-    ghostWrapper.style.justifyContent = "flex-start";
-    ghostWrapper.style.gap = "8px";
-    ghostWrapper.style.marginBottom = "16px";
+    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const ghostToggle = ghostWrapper.createEl("input", { type: "checkbox" });
-    ghostToggle.style.flexShrink = "0";
     ghostToggle.checked = !!this.pathObj.enableGhostMode;
     const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
-    ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
 
     // Show in Unlock Menu toggle
-    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
-    menuWrapper.style.display = "flex";
-    menuWrapper.style.flexDirection = "row";
-    menuWrapper.style.alignItems = "center";
-    menuWrapper.style.justifyContent = "flex-start";
-    menuWrapper.style.gap = "8px";
-    menuWrapper.style.marginBottom = "16px";
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container sg-flex-row" });
     const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
-    menuToggle.style.flexShrink = "0";
     menuToggle.checked = !!this.pathObj.showInUnlockMenu;
     const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
-    menuLabel.style.cursor = "pointer";
     menuLabel.addEventListener("click", () => {
       if (!menuToggle.disabled) {
         menuToggle.click();
@@ -1012,12 +926,9 @@ class EditPathModal extends Modal {
 
     // Description text for the new toggle
     const menuDesc = contentEl.createEl("p", {
-      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed.",
+      cls: "sg-modal-desc-small"
     });
-    menuDesc.style.fontSize = "0.85em";
-    menuDesc.style.color = "var(--text-muted)";
-    menuDesc.style.marginTop = "-12px";
-    menuDesc.style.marginBottom = "16px";
 
     // Enforce initial disabled state if Ghost Mode was already enabled
     if (ghostToggle.checked) {
@@ -1035,10 +946,7 @@ class EditPathModal extends Modal {
       }
     });
 
-    const pwdControls = contentEl.createDiv();
-    pwdControls.style.display = "flex";
-    pwdControls.style.gap = "8px";
-    pwdControls.style.marginBottom = "16px";
+    const pwdControls = contentEl.createDiv("sg-modal-button-row-left");
 
     const pwdBtn = pwdControls.createEl("button", { text: this.pathObj.passwordHash ? "Change Path Password" : "Set Path Password" });
     pwdBtn.addEventListener("click", () => {
@@ -1070,10 +978,7 @@ class EditPathModal extends Modal {
 
     const errorEl = contentEl.createDiv("sg-error");
 
-    const controls = contentEl.createDiv();
-    controls.style.display = "flex";
-    controls.style.gap = "8px";
-    controls.style.marginTop = "16px";
+    const controls = contentEl.createDiv("sg-modal-button-row-right");
 
     const submitBtn = controls.createEl("button", { text: "Save", cls: "mod-cta" });
     const cancelBtn = controls.createEl("button", { text: "Cancel" });

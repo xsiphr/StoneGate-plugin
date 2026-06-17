@@ -91,12 +91,14 @@ export class LockOverlay {
     
     const bgUrlSetting = this.settings.customBackgroundUrl;
     if (!bgUrlSetting) {
-      this.bgLayerEl.style.backgroundImage = "";
-      this.bgLayerEl.style.backgroundSize = "";
-      this.bgLayerEl.style.backgroundPosition = "";
-      this.bgLayerEl.style.filter = "";
-      this.bgLayerEl.style.transform = "";
-      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+      this.bgLayerEl.setCssStyles({
+        backgroundImage: "",
+        backgroundSize: "",
+        backgroundPosition: "",
+        filter: "",
+        transform: "",
+        webkitTransform: ""
+      });
       return;
     }
 
@@ -110,19 +112,23 @@ export class LockOverlay {
     console.log("StoneGate: Applying background from:", resolvedUrl);
 
     if (resolvedUrl) {
-      this.bgLayerEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`;
-      this.bgLayerEl.style.backgroundSize = "cover";
-      this.bgLayerEl.style.backgroundPosition = "center";
-      this.bgLayerEl.style.filter = "blur(10px)";
-      this.bgLayerEl.style.transform = "scale(1.1)";
-      this.bgLayerEl.style.setProperty("-webkit-transform", "scale(1.1)");
+      this.bgLayerEl.setCssStyles({
+        backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        filter: "blur(10px)",
+        transform: "scale(1.1)",
+        webkitTransform: "scale(1.1)"
+      });
     } else {
-      this.bgLayerEl.style.backgroundImage = "";
-      this.bgLayerEl.style.backgroundSize = "";
-      this.bgLayerEl.style.backgroundPosition = "";
-      this.bgLayerEl.style.filter = "";
-      this.bgLayerEl.style.transform = "";
-      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+      this.bgLayerEl.setCssStyles({
+        backgroundImage: "",
+        backgroundSize: "",
+        backgroundPosition: "",
+        filter: "",
+        transform: "",
+        webkitTransform: ""
+      });
     }
   }
 
@@ -169,7 +175,7 @@ export class LockOverlay {
 
     // Recovery bypass link — always in DOM, toggled via display style
     this.recoveryBypassEl = card.createDiv("sg-recovery-bypass");
-    this.recoveryBypassEl.style.display = "none";
+    this.recoveryBypassEl.hide();
     const recoveryLink = this.recoveryBypassEl.createEl("a", {
       text: "Use Recovery Code",
       cls: "sg-recovery-link"
@@ -243,10 +249,10 @@ export class LockOverlay {
     this.currentCallback = callback;
     
     if (this.settings.showStoneGateTitle) {
-      this.appNameEl!.style.display = "block";
+      this.appNameEl!.show();
       this.appNameEl!.textContent = this.settings.customTitle || "StoneGate";
     } else {
-      this.appNameEl!.style.display = "none";
+      this.appNameEl!.hide();
     }
     
     this.titleEl!.textContent = `${path.label || path.path || "Vault"}`;
@@ -265,7 +271,7 @@ export class LockOverlay {
     
     // Disable workspace pointer events
     const workspace = document.body.querySelector(".workspace") as HTMLElement;
-    if (workspace) workspace.style.pointerEvents = "none";
+    if (workspace) workspace.setCssStyles({ pointerEvents: "none" });
 
     // Block keyboard events
     document.addEventListener("keydown", this.boundHandleKeydown, true);
@@ -307,7 +313,7 @@ export class LockOverlay {
         this.containerEl.addClass("sg-overlay-hidden");
       }
       const workspace = document.body.querySelector(".workspace") as HTMLElement;
-      if (workspace) workspace.style.pointerEvents = "";
+      if (workspace) workspace.setCssStyles({ pointerEvents: "" });
       document.removeEventListener("keydown", this.boundHandleKeydown, true);
     }, 300); // match animation duration
   }
@@ -409,7 +415,7 @@ export class LockOverlay {
       this.lockoutEl!.textContent = `Locked out for ${secondsLeft} seconds`;
 
       if (this.settings.recoveryCodeHash) {
-        this.recoveryBypassEl!.style.display = "block";
+        this.recoveryBypassEl!.show();
       }
     } else {
       if (this.settings.lockoutUntil !== 0) {
@@ -419,7 +425,7 @@ export class LockOverlay {
       this.inputEl!.disabled = false;
       this.submitBtnEl!.disabled = false;
       this.lockoutEl!.textContent = "";
-      this.recoveryBypassEl!.style.display = "none";
+      this.recoveryBypassEl!.hide();
       
       if (this.settings.maxFailedAttempts > 0 && this.settings.failedAttempts > 0) {
         this.counterEl!.textContent = `${this.settings.failedAttempts} / ${this.settings.maxFailedAttempts} attempts`;
@@ -486,17 +492,15 @@ class RecoveryBypassModal extends Modal {
     contentEl.createEl("h2", { text: "🔑 Emergency Recovery Bypass" });
 
     const desc = contentEl.createEl("p", {
-      text: "You are currently locked out. Enter your 6-character Recovery Code to immediately bypass the lockout and unlock."
+      text: "You are currently locked out. Enter your 6-character Recovery Code to immediately bypass the lockout and unlock.",
+      cls: "sg-recovery-desc"
     });
-    desc.style.marginBottom = "16px";
-    desc.style.color = "var(--text-muted)";
-    desc.style.fontSize = "0.9em";
 
-    const inputWrapper = contentEl.createDiv();
-    inputWrapper.style.position = "relative";
+    const inputWrapper = contentEl.createDiv("sg-recovery-input-wrapper");
 
     const input = inputWrapper.createEl("input", {
       type: "text",
+      cls: "sg-recovery-input",
       attr: {
         placeholder: "XXXXXX",
         maxlength: "6",
@@ -504,15 +508,6 @@ class RecoveryBypassModal extends Modal {
         spellcheck: "false"
       }
     });
-    input.style.width = "100%";
-    input.style.textTransform = "uppercase";
-    input.style.letterSpacing = "4px";
-    input.style.textAlign = "center";
-    input.style.fontSize = "1.4em";
-    input.style.fontFamily = "monospace";
-    input.style.padding = "10px 14px";
-    input.style.boxSizing = "border-box";
-    input.style.marginBottom = "12px";
 
     input.addEventListener("input", () => {
       const pos = input.selectionStart ?? input.value.length;
@@ -520,20 +515,12 @@ class RecoveryBypassModal extends Modal {
       input.setSelectionRange(pos, pos);
     });
 
-    const errorEl = contentEl.createDiv();
-    errorEl.style.color = "var(--text-error)";
-    errorEl.style.fontSize = "0.85em";
-    errorEl.style.marginBottom = "16px";
-    errorEl.style.minHeight = "1.2em";
+    const errorEl = contentEl.createDiv("sg-recovery-error");
 
-    const btnRow = contentEl.createDiv();
-    btnRow.style.display = "flex";
-    btnRow.style.gap = "10px";
-    btnRow.style.justifyContent = "flex-end";
+    const btnRow = contentEl.createDiv("sg-recovery-btn-row");
 
     const cancelBtn = btnRow.createEl("button", { text: "Cancel" });
     const unlockBtn = btnRow.createEl("button", { text: "Use Recovery Code", cls: "mod-cta" });
-    unlockBtn.style.marginTop = "0";
 
     let submitted = false;
 

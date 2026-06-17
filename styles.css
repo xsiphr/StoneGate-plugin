@@ -302,3 +302,143 @@
     text-decoration: underline;
     background: transparent;
 }
+
+/* Static layout classes for Obsidian StoneGate Modals */
+.sg-modal-input-container label {
+    display: block;
+}
+
+.sg-modal-input-container.sg-flex-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.sg-modal-input-container.sg-flex-row input[type="checkbox"] {
+    flex-shrink: 0;
+}
+
+.sg-modal-input-container span {
+    cursor: pointer;
+}
+
+.sg-modal-desc-small {
+    font-size: 0.85em;
+    color: var(--text-muted);
+    margin-top: -12px;
+    margin-bottom: 16px;
+}
+
+.sg-modal-button-row-left {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+
+.sg-modal-button-row-right {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+}
+
+.sg-path-password-btn {
+    margin-bottom: 16px;
+}
+
+.sg-modal-submit-btn {
+    margin-top: 16px;
+}
+
+/* Recovery Bypass Modal styles */
+.sg-recovery-desc {
+    margin-bottom: 16px;
+    color: var(--text-muted);
+    font-size: 0.9em;
+}
+
+.sg-recovery-input-wrapper {
+    position: relative;
+}
+
+.sg-recovery-input {
+    width: 100%;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    text-align: center;
+    font-size: 1.4em;
+    font-family: monospace;
+    padding: 10px 14px;
+    box-sizing: border-box;
+    margin-bottom: 12px;
+}
+
+.sg-recovery-error {
+    color: var(--text-error);
+    font-size: 0.85em;
+    margin-bottom: 16px;
+    min-height: 1.2em;
+}
+
+.sg-recovery-btn-row {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.sg-recovery-btn-row button.mod-cta {
+    margin-top: 0;
+}
+
+/* Recovery Code Display Modal styles */
+.sg-display-desc {
+    margin-bottom: 16px;
+}
+
+.sg-display-warning-box {
+    border: 1px solid var(--text-error);
+    background-color: rgba(255, 0, 0, 0.05);
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.sg-display-warning-title {
+    color: var(--text-error);
+    display: block;
+    margin-bottom: 6px;
+}
+
+.sg-display-warning-text {
+    font-size: 0.9em;
+}
+
+.sg-display-code-container {
+    text-align: center;
+    margin: 24px 0;
+    padding: 16px;
+    border-radius: 8px;
+    background-color: var(--background-secondary-alt);
+    border: 2px dashed var(--interactive-accent);
+}
+
+.sg-display-code-el {
+    font-size: 2.4em;
+    font-weight: bold;
+    letter-spacing: 6px;
+    color: var(--interactive-accent);
+    font-family: monospace;
+    user-select: all;
+}
+
+.sg-display-button-row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 24px;
+}
+
+.sg-modal-input-container.sg-small-margin {
+    margin-bottom: 8px;
+}
