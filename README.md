@@ -2,46 +2,70 @@
   <img src="assets/StoneGate-logo.png" width="500" alt="StoneGate Logo">
 </p>
 
-StoneGate is a lock screen plugin for Obsidian, designed to protect your vault and individual folders with password authentication.
+<p align="center">
+  <strong>Lock screen and vault protection for Obsidian, built on top of your password.</strong>
+</p>
 
-### 🚀 Features
+<p align="center">
+  <img src="https://img.shields.io/badge/version-2.0.0-blueviolet" alt="Version">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/platform-desktop%20%7C%20mobile-informational" alt="Platform">
+</p>
 
-* **Vault & Folder Protection**: Lock your entire vault or specific sensitive folders with unique passwords.
-* **Idle Timeout**: Automatically lock your vault after a period of inactivity.
-* **Persistent Lockout**: Protect against brute-force attacks with a secure lockout mechanism after failed attempts.
-* **Emergency Recovery**: Generate a one-time secure recovery code to bypass lockouts if you forget your password.
-* **Stealth Mode (Ghost Mode)**: Hide protected folders from the File Explorer entirely.
-* **Custom Backgrounds**: Set custom background images using external URLs or files directly from your vault.
+---
 
-### ⌨️ Hotkeys
-You can configure these hotkeys in Obsidian's **Settings > Hotkeys**:
+StoneGate protects your Obsidian vault and individual folders with password authentication, idle timeouts, brute-force lockouts, and an optional stealth mode that hides protected folders entirely.
 
-* **StoneGate: Lock Vault**: Manually trigger the lock screen.
-* **StoneGate: Unlock Protected Paths**: Open the menu to unlock and access specific hidden or protected folders.
+## 🚀 Features
 
-### 🛠 Installation
+| Feature | Description |
+|---|---|
+| **Vault & Folder Protection** | Lock your entire vault or specific sensitive folders, each with its own password. |
+| **Idle Timeout** | Automatically re-lock a path after a configurable period of inactivity. |
+| **Persistent Lockout** | Blocks further attempts for a cooldown period after repeated failed passwords. |
+| **Emergency Recovery** | Generate a one-time recovery code to regain access if you forget your password. |
+| **Ghost Mode** | Hide protected folders from the File Explorer entirely until unlocked. |
+| **Custom Backgrounds** | Set a custom lock screen background from a URL or a file in your vault. |
 
-Currently, StoneGate is in pre-release. You can install it using the **BRAT** plugin:
+## 🛠 Installation
 
-1. Install **Obsidian42 - BRAT** from the Community Plugins browser.
-2. Open BRAT settings.
-3. Add `xsiphr/StoneGate-plugin` to the list of Beta plugins.
-4. Enable StoneGate in your Community Plugins list.
+**From Community Plugins (recommended)**
 
-### 🛡 Security Practices
+1. Open Obsidian's **Settings → Community plugins**.
+2. Make sure **Restricted mode** is turned off.
+3. Click **Browse** and search for "StoneGate".
+4. Click **Install**, then **Enable** the plugin.
 
-* **Hashing**: StoneGate uses industry-standard `bcrypt` for all password and recovery code hashing.
-* **Data Integrity**: Your secrets are stored locally. We never transmit your passwords or vault data to any external server.
-* **Recommendation**: For maximum security, we recommend using this plugin in combination with system-level encryption (e.g., Cryptomator) for your vault files.
+**Manual installation**
 
-### ⚙️ Configuration
+1. Download `main.js`, `manifest.json`, and `styles.css` from the [latest release](https://github.com/xsiphr/StoneGate-plugin/releases/latest).
+2. Create a folder named `stonegate` inside your vault's `.obsidian/plugins/` directory.
+3. Copy the three downloaded files into that folder.
+4. Reload Obsidian and enable StoneGate from **Settings → Community plugins**.
 
-* **Master Password**: Set this in the settings tab to enable the base protection.
-* **Recovery Code**: Generate your recovery code under "Recovery Options." **Keep this code offline!** It is the only way to regain access if you forget your password.
-* **Ghost Mode**: When enabled, the folder will vanish from the file explorer. Use the "Unlock Menu" (Command Palette: `StoneGate: Unlock Path`) to access it.
+## ⚙️ Configuration
 
-### 📝 License
+- **Master Password** — set in the plugin's settings tab to enable base vault protection.
+- **Per-folder passwords** — add a protected path and give it its own password, independent of the master password.
+- **Recovery Code** — generate under "Recovery Options." Keep this code offline; it's the only way back in if you forget your password.
+- **Ghost Mode** — when enabled on a path, that folder disappears from the File Explorer while locked. Reach it via the Command Palette (`StoneGate: Unlock hidden/locked path`).
 
-This project is licensed under the MIT License.
+## ⌨️ Hotkeys
 
-*Built with passion by [Abdulrahman Agiba | xsiphr](https://github.com/xsiphr).*
+Configure these under **Settings → Hotkeys**:
+
+- **Lock vault now** — manually trigger the lock screen.
+- **Lock current folder** — lock just the folder containing the active file.
+- **Unlock hidden/locked path** — open the menu to find and unlock a protected or hidden path.
+
+## 🛡 Security Practices
+
+- **Hashing** — passwords and recovery codes are hashed with PBKDF2 (SHA-256, 200,000 iterations) via the Web Crypto API, each with a unique random salt.
+- **Local only** — all secrets stay on your device. Nothing is transmitted to an external server.
+- **Defense in depth** — for sensitive vaults, pair StoneGate with system-level encryption (e.g. Cryptomator) rather than relying on it alone.
+
+## 📝 License
+
+MIT — see [LICENSE](LICENSE).
+
+Built by [Abdulrahman Agiba (xsiphr)](https://github.com/xsiphr).
