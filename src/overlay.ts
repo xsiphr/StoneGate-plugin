@@ -89,7 +89,25 @@ export class LockOverlay {
   private applyBackgroundStyles() {
     if (!this.containerEl || !this.bgLayerEl) return;
     
-    const resolvedUrl = this.resolveBackgroundUrl(this.settings.customBackgroundUrl);
+    const bgUrlSetting = this.settings.customBackgroundUrl;
+    if (!bgUrlSetting) {
+      this.bgLayerEl.style.backgroundImage = "";
+      this.bgLayerEl.style.backgroundSize = "";
+      this.bgLayerEl.style.backgroundPosition = "";
+      this.bgLayerEl.style.filter = "";
+      this.bgLayerEl.style.transform = "";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+      return;
+    }
+
+    let resolvedUrl = "";
+    try {
+      resolvedUrl = this.resolveBackgroundUrl(bgUrlSetting);
+    } catch (e) {
+      console.warn("StoneGate: Background url resolution threw error:", e);
+    }
+
+    console.log("StoneGate: Applying background from:", resolvedUrl);
 
     if (resolvedUrl) {
       this.bgLayerEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`;
@@ -220,8 +238,6 @@ export class LockOverlay {
   public show(path: ProtectedPath, previousFile: string | null, callback: UnlockCallback) {
     if (!this.containerEl) return;
     
-    this.applyBackgroundStyles();
-    
     this.currentPath = path;
     this.previousFile = previousFile;
     this.currentCallback = callback;
@@ -253,6 +269,15 @@ export class LockOverlay {
 
     // Block keyboard events
     document.addEventListener("keydown", this.boundHandleKeydown, true);
+
+    // Hook into Obsidian layout lifecycle
+    if (this.app.workspace.layoutReady) {
+      this.applyBackgroundStyles();
+    } else {
+      this.app.workspace.onLayoutReady(() => {
+        this.applyBackgroundStyles();
+      });
+    }
 
     if (this.inputEl) {
       this.inputEl.value = "";
