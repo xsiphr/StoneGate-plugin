@@ -135,6 +135,7 @@ var LockManager = class {
     }
     if (lockOccurred) {
       this.notifyStateChange(true);
+      this.updateGhostModeStyles();
     }
     const currentFile = this.app.workspace.getActiveFile();
     if (currentFile && this.isLocked(currentFile.path)) {

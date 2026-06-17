@@ -92,6 +92,7 @@ export class LockManager {
 
     if (lockOccurred) {
       this.notifyStateChange(true);
+      this.updateGhostModeStyles();
     }
     
     const currentFile = this.app.workspace.getActiveFile();
