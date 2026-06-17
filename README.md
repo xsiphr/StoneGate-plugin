@@ -13,6 +13,12 @@ StoneGate is a lock screen plugin for Obsidian, designed to protect your vault a
 * **Stealth Mode (Ghost Mode)**: Hide protected folders from the File Explorer entirely.
 * **Custom Backgrounds**: Set custom background images using external URLs or files directly from your vault.
 
+### ⌨️ Hotkeys
+You can configure these hotkeys in Obsidian's **Settings > Hotkeys**:
+
+* **StoneGate: Lock Vault**: Manually trigger the lock screen.
+* **StoneGate: Unlock Protected Paths**: Open the menu to unlock and access specific hidden or protected folders.
+
 ### 🛠 Installation
 
 Currently, StoneGate is in pre-release. You can install it using the **BRAT** plugin:
