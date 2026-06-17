@@ -3,8 +3,8 @@
   "name": "StoneGate",
   "version": "2.0.0",
   "minAppVersion": "1.4.0",
-  "description": "Lock screen protection for your vault",
-  "author": "StoneGate Author",
-  "authorUrl": "",
+  "description": "Secure lock screen and vault protection for Desktop and Mobile.",
+  "author": "xsiphr",
+  "authorUrl": "https://github.com/xsiphr",
   "isDesktopOnly": false
 }
