@@ -50,4 +50,4 @@ Currently, StoneGate is in pre-release. You can install it using the BRAT plugin
 
 This project is licensed under the MIT License.
 
-Built with passion by Abdulrahman Agiba.
+Built with passion by Abdulrahman Agiba |xsiphr . 
