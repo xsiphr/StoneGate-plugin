@@ -1,4 +1,4 @@
-import { App, Modal, Notice } from "obsidian";
+import { App, Modal, Notice, TFile } from "obsidian";
 import { StoneGateSettings, ProtectedPath } from "./types";
 import { verifyPassword } from "./crypto";
 
@@ -8,6 +8,7 @@ export class LockOverlay {
   private app: App;
   private settings: StoneGateSettings;
   private containerEl: HTMLElement | null = null;
+  private bgLayerEl: HTMLElement | null = null;
   private inputEl: HTMLInputElement | null = null;
   private submitBtnEl: HTMLButtonElement | null = null;
   private errorEl: HTMLElement | null = null;
@@ -37,11 +38,81 @@ export class LockOverlay {
 
   updateSettings(settings: StoneGateSettings) {
     this.settings = settings;
+    this.applyBackgroundStyles();
+  }
+
+  private resolveBackgroundUrl(url: string): string {
+    if (!url) return "";
+    url = url.trim();
+
+    if (/^(https?:\/\/|data:|app:\/\/)/i.test(url)) {
+      return url;
+    }
+
+    if (url.startsWith("obsidian://")) {
+      try {
+        const parsed = new URL(url);
+        const filePath = parsed.searchParams.get("file") || parsed.searchParams.get("path");
+        if (filePath) {
+          const file = this.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(filePath), "") || 
+                       this.app.vault.getAbstractFileByPath(decodeURIComponent(filePath));
+          if (file && file instanceof TFile) {
+            return this.app.vault.getResourcePath(file);
+          }
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    const file = this.app.metadataCache.getFirstLinkpathDest(url, "") || 
+                 this.app.vault.getAbstractFileByPath(url);
+    if (file && file instanceof TFile) {
+      return this.app.vault.getResourcePath(file);
+    }
+
+    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/i.test(url) || url.startsWith("\\\\");
+    const isPosixAbsolute = url.startsWith("/");
+
+    if (isWindowsAbsolute || isPosixAbsolute) {
+      let normalizedPath = url.replace(/\\/g, "/");
+      if (normalizedPath.startsWith("/")) {
+        return `app://local${normalizedPath}`;
+      } else {
+        return `app://local/${normalizedPath}`;
+      }
+    }
+
+    return url;
+  }
+
+  private applyBackgroundStyles() {
+    if (!this.containerEl || !this.bgLayerEl) return;
+    
+    const resolvedUrl = this.resolveBackgroundUrl(this.settings.customBackgroundUrl);
+
+    if (resolvedUrl) {
+      this.bgLayerEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`;
+      this.bgLayerEl.style.backgroundSize = "cover";
+      this.bgLayerEl.style.backgroundPosition = "center";
+      this.bgLayerEl.style.filter = "blur(10px)";
+      this.bgLayerEl.style.transform = "scale(1.1)";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "scale(1.1)");
+    } else {
+      this.bgLayerEl.style.backgroundImage = "";
+      this.bgLayerEl.style.backgroundSize = "";
+      this.bgLayerEl.style.backgroundPosition = "";
+      this.bgLayerEl.style.filter = "";
+      this.bgLayerEl.style.transform = "";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+    }
   }
 
   private createOverlay() {
     this.containerEl = document.createElement("div");
     this.containerEl.addClass("sg-overlay-container", "sg-overlay-hidden");
+
+    this.bgLayerEl = this.containerEl.createDiv("sg-background-layer");
 
     const card = this.containerEl.createDiv("sg-overlay-card");
     this.appNameEl = card.createEl("div", { text: "StoneGate", cls: "sg-app-name" });
@@ -116,6 +187,13 @@ export class LockOverlay {
   private handleKeydown(e: KeyboardEvent) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden")) return;
     
+    const recoveryModal = document.querySelector(".sg-recovery-modal-container");
+    const recoveryInput = recoveryModal?.querySelector("input") as HTMLInputElement;
+    if (recoveryInput && document.activeElement === recoveryInput) {
+      e.stopPropagation();
+      return;
+    }
+
     // Stop all key events from propagating to obsidian workspace
     e.stopPropagation();
     
@@ -139,6 +217,8 @@ export class LockOverlay {
 
   public show(path: ProtectedPath, previousFile: string | null, callback: UnlockCallback) {
     if (!this.containerEl) return;
+    
+    this.applyBackgroundStyles();
     
     this.currentPath = path;
     this.previousFile = previousFile;
@@ -391,7 +471,7 @@ class RecoveryBypassModal extends Modal {
     const input = inputWrapper.createEl("input", {
       type: "text",
       attr: {
-        placeholder: "e.g. AB3X7K",
+        placeholder: "XXXXXX",
         maxlength: "6",
         autocomplete: "off",
         spellcheck: "false"

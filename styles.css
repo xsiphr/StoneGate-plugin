@@ -18,6 +18,14 @@
     z-index: 10001 !important;
 }
 
+.sg-background-layer {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+    overflow: hidden;
+    pointer-events: none;
+}
+
 .sg-overlay-hidden {
     display: none !important;
 }
@@ -31,6 +39,8 @@
 }
 
 .sg-overlay-card {
+    position: relative;
+    z-index: 2;
     background-color: var(--background-secondary, #2d2d2d);
     border: 1px solid var(--background-modifier-border, #444);
     border-radius: var(--radius-l, 8px);

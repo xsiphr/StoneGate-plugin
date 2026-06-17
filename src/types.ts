@@ -34,4 +34,5 @@ export interface StoneGateSettings {
   unlockMenuPasswordHash?: string;
   unlockMenuPasswordSalt?: string;
   unlockMenuPasswordHint?: string;
+  customBackgroundUrl: string;
 }

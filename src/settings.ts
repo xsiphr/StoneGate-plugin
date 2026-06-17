@@ -296,6 +296,19 @@ export class StoneGateSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName("Custom Background URL/Path")
+      .setDesc("URL or local path to a custom background image. You can copy an Obsidian URL using the 'Copy Obsidian URL' feature (starts with app://obsidian.md/...).")
+      .addText((text) =>
+        text
+          .setPlaceholder("https://example.com/image.jpg")
+          .setValue(this.plugin.settings.customBackgroundUrl || "")
+          .onChange(async (value) => {
+            this.plugin.settings.customBackgroundUrl = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
 
 
     containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
