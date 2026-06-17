@@ -1,6 +1,6 @@
-StoneGate 🔒
 
-StoneGate is a high-security lock screen plugin for Obsidian, designed to protect your vault and individual folders with password authentication.
+
+StoneGate is a lock screen plugin for Obsidian, designed to protect your vault and individual folders with password authentication.
 
 Stop worrying about prying eyes. Whether you are using your vault in a public space or sharing your device, StoneGate ensures your sensitive notes remain private.
 🚀 Features
@@ -11,22 +11,21 @@ Stop worrying about prying eyes. Whether you are using your vault in a public sp
 
     Persistent Lockout: Protect against brute-force attacks with a secure lockout mechanism after failed attempts.
 
-    Emergency Recovery: Never lose access—generate a one-time secure recovery code to bypass lockouts.
+    Emergency Recovery: Generate a one-time secure recovery code to bypass lockouts if you forget your password.
 
     Stealth Mode (Ghost Mode): Hide protected folders from the File Explorer entirely.
 
-    Premium Customization: * Set custom background images (supports external URLs and Vault paths).
-    
+    Custom Backgrounds: Set custom background images using external URLs or files directly from your vault.
 
 🛠 Installation
 
 Currently, StoneGate is in pre-release. You can install it using the BRAT plugin:
 
-    Install  BRAT from the Community Plugins browser.
+    Install Obsidian42 - BRAT from the Community Plugins browser.
 
     Open BRAT settings.
 
-    Add `xsiphr/StoneGate-plugin` to the list of Beta plugins.
+    Add xsiphr/StoneGate-plugin to the list of Beta plugins.
 
     Enable StoneGate in your Community Plugins list.
 
@@ -50,4 +49,4 @@ Currently, StoneGate is in pre-release. You can install it using the BRAT plugin
 
 This project is licensed under the MIT License.
 
-Built with passion by Abdulrahman Agiba |xsiphr . 
+Built with passion by Abdulrahman Agiba | xsiphr.
