@@ -190,7 +190,9 @@ export class LockOverlay {
     const recoveryModal = document.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal?.querySelector("input") as HTMLInputElement;
     if (recoveryInput && document.activeElement === recoveryInput) {
-      e.stopPropagation();
+      if (e.key !== "Enter") {
+        e.stopPropagation();
+      }
       return;
     }
 
@@ -546,6 +548,7 @@ class RecoveryBypassModal extends Modal {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         attempt();
       }
     });

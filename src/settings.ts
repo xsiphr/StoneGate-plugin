@@ -1,4 +1,4 @@
-import { App, Modal, PluginSettingTab, Setting, TFolder, Notice } from "obsidian";
+import { App, Modal, PluginSettingTab, Setting, TFolder, Notice, AbstractInputSuggest } from "obsidian";
 import type StoneGatePlugin from "./main";
 import { ProtectedPath } from "./types";
 import { generateSalt, hashPassword, uint8ArrayToBase64, verifyPassword, generateRecoveryCode } from "./crypto";
@@ -299,15 +299,16 @@ export class StoneGateSettingTab extends PluginSettingTab {
     new Setting(containerEl)
       .setName("Custom Background URL/Path")
       .setDesc("URL or local path to a custom background image. You can copy an Obsidian URL using the 'Copy Obsidian URL' feature (starts with app://obsidian.md/...).")
-      .addText((text) =>
+      .addText((text) => {
         text
           .setPlaceholder("https://example.com/image.jpg")
           .setValue(this.plugin.settings.customBackgroundUrl || "")
           .onChange(async (value) => {
             this.plugin.settings.customBackgroundUrl = value.trim();
             await this.plugin.saveSettings();
-          })
-      );
+          });
+        new ImagePathSuggest(this.app, text.inputEl);
+      });
 
 
 
@@ -1035,5 +1036,39 @@ class EditPathModal extends Modal {
 
   onClose() {
     this.contentEl.empty();
+  }
+}
+
+export class ImagePathSuggest extends AbstractInputSuggest<string> {
+  private inputEl: HTMLInputElement;
+
+  constructor(app: App, inputEl: HTMLInputElement) {
+    super(app, inputEl);
+    this.inputEl = inputEl;
+  }
+
+  protected getSuggestions(query: string): string[] {
+    const files = this.app.vault.getFiles();
+    const extensions = ["png", "jpg", "jpeg", "gif", "svg", "webp"];
+    const lowerQuery = query.toLowerCase();
+
+    return files
+      .filter((file) => {
+        const ext = file.extension.toLowerCase();
+        const matchesExtension = extensions.includes(ext);
+        const matchesQuery = file.path.toLowerCase().contains(lowerQuery);
+        return matchesExtension && matchesQuery;
+      })
+      .map((file) => file.path);
+  }
+
+  renderSuggestion(value: string, el: HTMLElement): void {
+    el.setText(value);
+  }
+
+  selectSuggestion(value: string, evt: MouseEvent | KeyboardEvent): void {
+    this.setValue(value);
+    this.inputEl.dispatchEvent(new Event("input"));
+    this.close();
   }
 }
