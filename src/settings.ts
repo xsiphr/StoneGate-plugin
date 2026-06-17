@@ -541,6 +541,7 @@ export class PasswordModal extends Modal {
         const isMatch = await verifyPassword(currentInput.value, this.targetHash, this.targetSalt);
         if (!isMatch) {
           errorEl.textContent = "Current password is incorrect.";
+          currentInput.value = "";
           currentInput.setCssStyles({ borderColor: "#e05555" });
           return;
         }
@@ -642,6 +643,7 @@ export class ConfirmPasswordModal extends Modal {
         this.close();
       } else {
         errorEl.textContent = "Incorrect password.";
+        input.value = "";
         input.setCssStyles({ borderColor: "#e05555" });
       }
     };

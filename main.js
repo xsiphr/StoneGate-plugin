@@ -629,11 +629,11 @@ var LockOverlay = class {
       return;
     }
     if (e.key === "Enter") {
-      e.stopPropagation();
-      e.preventDefault();
       if (isRecoveryModalOpen) {
         return;
       }
+      e.stopPropagation();
+      e.preventDefault();
       void this.submit();
       return;
     }
@@ -669,6 +669,14 @@ var LockOverlay = class {
     const workspace = activeDocument.body.querySelector(".workspace");
     if (workspace)
       workspace.setCssStyles({ pointerEvents: "none" });
+    const modals = activeDocument.querySelectorAll(".modal-container");
+    modals.forEach((modal) => {
+      const htmlModal = modal;
+      if (htmlModal.style.display !== "none") {
+        htmlModal.setAttribute("data-sg-original-display", htmlModal.style.display || "block");
+        htmlModal.style.display = "none";
+      }
+    });
     window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
     if (this.app.workspace.layoutReady) {
       this.applyBackgroundStyles();
@@ -699,6 +707,15 @@ var LockOverlay = class {
       return;
     this.containerEl.removeClass("sg-overlay-fade-in");
     this.containerEl.addClass("sg-overlay-fade-out");
+    const modals = activeDocument.querySelectorAll(".modal-container");
+    modals.forEach((modal) => {
+      const htmlModal = modal;
+      const originalDisplay = htmlModal.getAttribute("data-sg-original-display");
+      if (originalDisplay) {
+        htmlModal.style.display = originalDisplay === "block" ? "" : originalDisplay;
+        htmlModal.removeAttribute("data-sg-original-display");
+      }
+    });
     window.setTimeout(() => {
       if (this.containerEl) {
         this.containerEl.addClass("sg-overlay-hidden");
@@ -1325,6 +1342,7 @@ var PasswordModal = class extends import_obsidian3.Modal {
         const isMatch = await verifyPassword(currentInput.value, this.targetHash, this.targetSalt);
         if (!isMatch) {
           errorEl.textContent = "Current password is incorrect.";
+          currentInput.value = "";
           currentInput.setCssStyles({ borderColor: "#e05555" });
           return;
         }
@@ -1408,6 +1426,7 @@ var ConfirmPasswordModal = class extends import_obsidian3.Modal {
         this.close();
       } else {
         errorEl.textContent = "Incorrect password.";
+        input.value = "";
         input.setCssStyles({ borderColor: "#e05555" });
       }
     };

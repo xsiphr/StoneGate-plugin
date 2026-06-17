@@ -251,11 +251,11 @@ export class LockOverlay {
     }
 
     if (e.key === "Enter") {
-      e.stopPropagation();
-      e.preventDefault();
       if (isRecoveryModalOpen) {
         return;
       }
+      e.stopPropagation();
+      e.preventDefault();
       void this.submit();
       return;
     }
@@ -299,6 +299,16 @@ export class LockOverlay {
     const workspace = activeDocument.body.querySelector(".workspace") as HTMLElement;
     if (workspace) workspace.setCssStyles({ pointerEvents: "none" });
 
+    // Hide active modals to prevent focus trapping
+    const modals = activeDocument.querySelectorAll(".modal-container");
+    modals.forEach((modal) => {
+      const htmlModal = modal as HTMLElement;
+      if (htmlModal.style.display !== "none") {
+        htmlModal.setAttribute("data-sg-original-display", htmlModal.style.display || "block");
+        htmlModal.style.display = "none";
+      }
+    });
+
     // Block keyboard events
     window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
 
@@ -333,6 +343,17 @@ export class LockOverlay {
 
     this.containerEl.removeClass("sg-overlay-fade-in");
     this.containerEl.addClass("sg-overlay-fade-out");
+
+    // Restore active modals
+    const modals = activeDocument.querySelectorAll(".modal-container");
+    modals.forEach((modal) => {
+      const htmlModal = modal as HTMLElement;
+      const originalDisplay = htmlModal.getAttribute("data-sg-original-display");
+      if (originalDisplay) {
+        htmlModal.style.display = originalDisplay === "block" ? "" : originalDisplay;
+        htmlModal.removeAttribute("data-sg-original-display");
+      }
+    });
 
     window.setTimeout(() => {
       if (this.containerEl) {
