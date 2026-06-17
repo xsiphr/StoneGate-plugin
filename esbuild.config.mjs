@@ -46,9 +46,11 @@ const context = await esbuild.context({
         build.onEnd((result) => {
           if (result.errors.length === 0) {
             const destinations = [
-              path.resolve(process.cwd(), "../StoneGate-plugin"),
-              "/home/xsip/Obsidian Hub/Testing/.obsidian/plugins/StoneGate-plugin"
+              path.resolve(process.cwd(), "../StoneGate-plugin")
             ];
+            if (process.env.OBSIDIAN_VAULT_PATH) {
+              destinations.push(process.env.OBSIDIAN_VAULT_PATH);
+            }
             for (const destDir of destinations) {
               if (!fs.existsSync(destDir)) {
                 fs.mkdirSync(destDir, { recursive: true });

@@ -1022,7 +1022,11 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         })
       ).addButton((btn) => {
         btn.setButtonText("Remove");
-        btn.setDestructive();
+        if (typeof btn.setDestructive === "function") {
+          btn.setDestructive();
+        } else {
+          btn["setWarning"]();
+        }
         btn.onClick(() => {
           new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
             if (success) {
@@ -1151,7 +1155,11 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         })
       ).addButton((btn) => {
         btn.setButtonText("Remove");
-        btn.setDestructive();
+        if (typeof btn.setDestructive === "function") {
+          btn.setDestructive();
+        } else {
+          btn["setWarning"]();
+        }
         btn.onClick(() => {
           new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
             if (success) {
@@ -1188,7 +1196,11 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
     if (this.plugin.settings.recoveryCodeHash) {
       recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton((btn) => {
         btn.setButtonText("Remove Recovery Code");
-        btn.setDestructive();
+        if (typeof btn.setDestructive === "function") {
+          btn.setDestructive();
+        } else {
+          btn["setWarning"]();
+        }
         btn.onClick(() => {
           new ConfirmPasswordModal(
             this.app,
