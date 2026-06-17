@@ -26,6 +26,7 @@ export class LockOverlay {
   private saveSettings: () => Promise<void>;
 
   private boundHandleKeydown = this.handleKeydown.bind(this);
+  private boundHandleFocus = this.handleFocus.bind(this);
   private observer: MutationObserver | null = null;
   private isRecoveryPromptOpen = false;
 
@@ -267,6 +268,27 @@ export class LockOverlay {
     }
   }
 
+  private handleFocus(e: FocusEvent) {
+    if (!this.isVisible()) return;
+
+    const isRecoveryModalOpen = !!activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryModal = activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryInput = recoveryModal?.querySelector("input") as HTMLInputElement;
+
+    if (isRecoveryModalOpen && recoveryInput) {
+      if (e.target !== recoveryInput) {
+        e.stopPropagation();
+        recoveryInput.focus();
+      }
+    } else if (this.inputEl && e.target !== this.inputEl) {
+      const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+      if (!isLockedOut) {
+        e.stopPropagation();
+        this.inputEl.focus();
+      }
+    }
+  }
+
   public show(path: ProtectedPath, previousFile: string | null, callback: UnlockCallback) {
     if (!this.containerEl) return;
     
@@ -311,6 +333,7 @@ export class LockOverlay {
 
     // Block keyboard events
     window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
+    activeDocument.addEventListener("focus", this.boundHandleFocus, true);
 
     // Hook into Obsidian layout lifecycle
     if (this.app.workspace.layoutReady) {
@@ -362,6 +385,7 @@ export class LockOverlay {
       const workspace = activeDocument.body.querySelector(".workspace") as HTMLElement;
       if (workspace) workspace.setCssStyles({ pointerEvents: "" });
       window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
+      activeDocument.removeEventListener("focus", this.boundHandleFocus, true);
     }, 300); // match animation duration
   }
 

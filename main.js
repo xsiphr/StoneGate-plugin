@@ -444,6 +444,7 @@ var LockOverlay = class {
     this.previousFile = null;
     this.lockoutTimer = null;
     this.boundHandleKeydown = this.handleKeydown.bind(this);
+    this.boundHandleFocus = this.handleFocus.bind(this);
     this.observer = null;
     this.isRecoveryPromptOpen = false;
     this.app = app;
@@ -643,6 +644,25 @@ var LockOverlay = class {
       return;
     }
   }
+  handleFocus(e) {
+    if (!this.isVisible())
+      return;
+    const isRecoveryModalOpen = !!activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryModal = activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryInput = recoveryModal == null ? void 0 : recoveryModal.querySelector("input");
+    if (isRecoveryModalOpen && recoveryInput) {
+      if (e.target !== recoveryInput) {
+        e.stopPropagation();
+        recoveryInput.focus();
+      }
+    } else if (this.inputEl && e.target !== this.inputEl) {
+      const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+      if (!isLockedOut) {
+        e.stopPropagation();
+        this.inputEl.focus();
+      }
+    }
+  }
   show(path, previousFile, callback) {
     if (!this.containerEl)
       return;
@@ -678,6 +698,7 @@ var LockOverlay = class {
       }
     });
     window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
+    activeDocument.addEventListener("focus", this.boundHandleFocus, true);
     if (this.app.workspace.layoutReady) {
       this.applyBackgroundStyles();
     } else {
@@ -724,6 +745,7 @@ var LockOverlay = class {
       if (workspace)
         workspace.setCssStyles({ pointerEvents: "" });
       window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
+      activeDocument.removeEventListener("focus", this.boundHandleFocus, true);
     }, 300);
   }
   async handleSuccessfulUnlock() {
