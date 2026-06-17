@@ -1,7 +1,10 @@
-import { App, Modal, PluginSettingTab, Setting, Notice, AbstractInputSuggest, setIcon } from "obsidian";
+import { App, Modal, PluginSettingTab, Setting, Notice, AbstractInputSuggest, setIcon, ButtonComponent } from "obsidian";
 import type StoneGatePlugin from "./main";
 import { ProtectedPath } from "./types";
 import { generateSalt, hashPassword, uint8ArrayToBase64, verifyPassword, generateRecoveryCode } from "./crypto";
+interface DestructiveButton extends ButtonComponent {
+  setDestructive?: () => this;
+}
 
 export class StoneGateSettingTab extends PluginSettingTab {
   plugin: StoneGatePlugin;
@@ -15,7 +18,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName("General").setHeading();
+    new Setting(containerEl).setName("Core").setHeading();
 
     // --- Protection Enable/Disable ---
     new Setting(containerEl)
@@ -35,22 +38,24 @@ export class StoneGateSettingTab extends PluginSettingTab {
                     isSyncing = true;
                     toggle.setValue(false);
                     isSyncing = false;
-                    new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", async (success, hash, salt) => {
-                      try {
-                        if (success && hash && salt) {
-                          this.plugin.settings.passwordHash = hash;
-                          this.plugin.settings.passwordSalt = salt;
-                          this.plugin.settings.enabled = true;
-                          await this.plugin.saveSettings();
-                          this.display();
-                        } else {
-                          isSyncing = true;
-                          toggle.setValue(false);
-                          isSyncing = false;
+                    new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", (success, hash, salt) => {
+                      void (async () => {
+                        try {
+                          if (success && hash && salt) {
+                            this.plugin.settings.passwordHash = hash;
+                            this.plugin.settings.passwordSalt = salt;
+                            this.plugin.settings.enabled = true;
+                            await this.plugin.saveSettings();
+                            this.display();
+                          } else {
+                            isSyncing = true;
+                            toggle.setValue(false);
+                            isSyncing = false;
+                          }
+                        } catch (e) {
+                          console.error("Password modal callback error:", e);
                         }
-                      } catch (e) {
-                        console.error("Password modal callback error:", e);
-                      }
+                      })();
                     }).open();
                   } else {
                     this.plugin.settings.enabled = true;
@@ -61,21 +66,23 @@ export class StoneGateSettingTab extends PluginSettingTab {
                   isSyncing = true;
                   toggle.setValue(true);
                   isSyncing = false;
-                  new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-                    try {
-                      if (success) {
-                        this.plugin.settings.enabled = false;
-                        await this.plugin.saveSettings();
-                        this.plugin.lockManager.lockAll();
-                        this.display();
-                      } else {
-                        isSyncing = true;
-                        toggle.setValue(true);
-                        isSyncing = false;
+                  new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success) => {
+                    void (async () => {
+                      try {
+                        if (success) {
+                          this.plugin.settings.enabled = false;
+                          await this.plugin.saveSettings();
+                          this.plugin.lockManager.lockAll();
+                          this.display();
+                        } else {
+                          isSyncing = true;
+                          toggle.setValue(true);
+                          isSyncing = false;
+                        }
+                      } catch (e) {
+                        console.error("Confirm password modal callback error:", e);
                       }
-                    } catch (e) {
-                      console.error("Confirm password modal callback error:", e);
-                    }
+                    })();
                   }).open();
                 }
               } catch (e) {
@@ -100,32 +107,37 @@ export class StoneGateSettingTab extends PluginSettingTab {
           btn
             .setButtonText("Change Password")
             .onClick(() => {
-              new PasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success, hash, salt) => {
-                if (success && hash && salt) {
-                  this.plugin.settings.passwordHash = hash;
-                  this.plugin.settings.passwordSalt = salt;
-                  await this.plugin.saveSettings();
-                  this.display();
-                }
+              new PasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success, hash, salt) => {
+                void (async () => {
+                  if (success && hash && salt) {
+                    this.plugin.settings.passwordHash = hash;
+                    this.plugin.settings.passwordSalt = salt;
+                    await this.plugin.saveSettings();
+                    this.display();
+                  }
+                })();
               }).open();
             })
         )
         .addButton((btn) => {
           btn.setButtonText("Remove");
-          if (typeof (btn as any).setDestructive === "function") {
-            (btn as any).setDestructive();
+          const dBtn = btn as DestructiveButton;
+          if (typeof dBtn.setDestructive === "function") {
+            dBtn.setDestructive();
           } else {
-            (btn as any)["setWarning"]();
+            dBtn["setWarning"]?.();
           }
           btn.onClick(() => {
-            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-              if (success) {
-                this.plugin.settings.passwordHash = undefined;
-                this.plugin.settings.passwordSalt = undefined;
-                this.plugin.settings.enabled = false; // Disable if no password
-                await this.plugin.saveSettings();
-                this.display();
-              }
+            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success) => {
+              void (async () => {
+                if (success) {
+                  this.plugin.settings.passwordHash = undefined;
+                  this.plugin.settings.passwordSalt = undefined;
+                  this.plugin.settings.enabled = false; // Disable if no password
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              })();
             }).open();
           });
         });
@@ -138,13 +150,15 @@ export class StoneGateSettingTab extends PluginSettingTab {
           .setButtonText("Set Password")
           .setCta()
           .onClick(() => {
-            new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", async (success, hash, salt) => {
-              if (success && hash && salt) {
-                this.plugin.settings.passwordHash = hash;
-                this.plugin.settings.passwordSalt = salt;
-                await this.plugin.saveSettings();
-                this.display();
-              }
+            new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", (success, hash, salt) => {
+              void (async () => {
+                if (success && hash && salt) {
+                  this.plugin.settings.passwordHash = hash;
+                  this.plugin.settings.passwordSalt = salt;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              })();
             }).open();
           })
       );
@@ -329,31 +343,36 @@ export class StoneGateSettingTab extends PluginSettingTab {
           btn
             .setButtonText("Change Password")
             .onClick(() => {
-              new PasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success, hash, salt) => {
-                if (success && hash && salt) {
-                  this.plugin.settings.unlockMenuPasswordHash = hash;
-                  this.plugin.settings.unlockMenuPasswordSalt = salt;
-                  await this.plugin.saveSettings();
-                  this.display();
-                }
+              new PasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", (success, hash, salt) => {
+                void (async () => {
+                  if (success && hash && salt) {
+                    this.plugin.settings.unlockMenuPasswordHash = hash;
+                    this.plugin.settings.unlockMenuPasswordSalt = salt;
+                    await this.plugin.saveSettings();
+                    this.display();
+                  }
+                })();
               }).open();
             })
         )
         .addButton((btn) => {
           btn.setButtonText("Remove");
-          if (typeof (btn as any).setDestructive === "function") {
-            (btn as any).setDestructive();
+          const dBtn = btn as DestructiveButton;
+          if (typeof dBtn.setDestructive === "function") {
+            dBtn.setDestructive();
           } else {
-            (btn as any)["setWarning"]();
+            dBtn["setWarning"]?.();
           }
           btn.onClick(() => {
-            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
-              if (success) {
-                this.plugin.settings.unlockMenuPasswordHash = undefined;
-                this.plugin.settings.unlockMenuPasswordSalt = undefined;
-                await this.plugin.saveSettings();
-                this.display();
-              }
+            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", (success) => {
+              void (async () => {
+                if (success) {
+                  this.plugin.settings.unlockMenuPasswordHash = undefined;
+                  this.plugin.settings.unlockMenuPasswordSalt = undefined;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              })();
             }).open();
           });
         });
@@ -363,13 +382,15 @@ export class StoneGateSettingTab extends PluginSettingTab {
           .setButtonText("Set Password")
           .setCta()
           .onClick(() => {
-            new PasswordModal(this.app, this.plugin, undefined, undefined, "Unlock Menu Password", async (success, hash, salt) => {
-              if (success && hash && salt) {
-                this.plugin.settings.unlockMenuPasswordHash = hash;
-                this.plugin.settings.unlockMenuPasswordSalt = salt;
-                await this.plugin.saveSettings();
-                this.display();
-              }
+            new PasswordModal(this.app, this.plugin, undefined, undefined, "Unlock Menu Password", (success, hash, salt) => {
+              void (async () => {
+                if (success && hash && salt) {
+                  this.plugin.settings.unlockMenuPasswordHash = hash;
+                  this.plugin.settings.unlockMenuPasswordSalt = salt;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              })();
             }).open();
           })
       );
@@ -399,10 +420,11 @@ export class StoneGateSettingTab extends PluginSettingTab {
         .setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).")
         .addButton((btn) => {
           btn.setButtonText("Remove Recovery Code");
-          if (typeof (btn as any).setDestructive === "function") {
-            (btn as any).setDestructive();
+          const dBtn = btn as DestructiveButton;
+          if (typeof dBtn.setDestructive === "function") {
+            dBtn.setDestructive();
           } else {
-            (btn as any)["setWarning"]();
+            dBtn["setWarning"]?.();
           }
           btn.onClick(() => {
             new ConfirmPasswordModal(
@@ -411,14 +433,16 @@ export class StoneGateSettingTab extends PluginSettingTab {
               undefined,
               undefined,
               "Master Password",
-              async (success) => {
-                if (success) {
-                  this.plugin.settings.recoveryCodeHash = undefined;
-                  this.plugin.settings.recoveryCodeSalt = undefined;
-                  await this.plugin.saveSettings();
-                  this.display();
-                  new Notice("Recovery Code removed successfully.");
-                }
+              (success) => {
+                void (async () => {
+                  if (success) {
+                    this.plugin.settings.recoveryCodeHash = undefined;
+                    this.plugin.settings.recoveryCodeSalt = undefined;
+                    await this.plugin.saveSettings();
+                    this.display();
+                    new Notice("Recovery Code removed successfully.");
+                  }
+                })();
               }
             ).open();
           });
@@ -435,17 +459,19 @@ export class StoneGateSettingTab extends PluginSettingTab {
               undefined,
               undefined,
               "Master Password",
-              async (success) => {
-                if (success) {
-                  const code = generateRecoveryCode();
-                  const saltBytes = generateSalt();
-                  const hash = await hashPassword(code.toUpperCase(), saltBytes);
-                  this.plugin.settings.recoveryCodeHash = hash;
-                  this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
-                  await this.plugin.saveSettings();
-                  this.display();
-                  new RecoveryCodeDisplayModal(this.app, code).open();
-                }
+              (success) => {
+                void (async () => {
+                  if (success) {
+                    const code = generateRecoveryCode();
+                    const saltBytes = generateSalt();
+                    const hash = await hashPassword(code.toUpperCase(), saltBytes);
+                    this.plugin.settings.recoveryCodeHash = hash;
+                    this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
+                    await this.plugin.saveSettings();
+                    this.display();
+                    new RecoveryCodeDisplayModal(this.app, code).open();
+                  }
+                })();
               }
             ).open();
           })
@@ -523,7 +549,8 @@ export class PasswordModal extends Modal {
       const p1 = newPasswordInput.value;
       const p2 = confirmPasswordInput.value;
 
-      if (!p1 || p1.length < 4 || !/^[\u0000-\u007F]*$/.test(p1)) {
+      const asciiRegex = new RegExp("^[" + String.fromCharCode(0) + "-\\u007F]*$");
+      if (!p1 || p1.length < 4 || !asciiRegex.test(p1)) {
         errorEl.textContent = "Password must be at least 4 ASCII characters.";
         return;
       }
@@ -539,11 +566,11 @@ export class PasswordModal extends Modal {
       this.close();
     };
 
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => { void submit(); });
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     newPasswordInput.addEventListener("keydown", handleKey);
@@ -619,11 +646,11 @@ export class ConfirmPasswordModal extends Modal {
       }
     };
 
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => { void submit(); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     });
     window.setTimeout(() => input.focus(), 50);
@@ -671,11 +698,13 @@ export class RecoveryCodeDisplayModal extends Modal {
     const buttonRow = contentEl.createDiv("sg-button-row sg-display-button-row");
 
     const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
-    copyBtn.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(this.code);
-      new Notice("Recovery code copied to clipboard!");
-      copyBtn.setText("Copied!");
-      window.setTimeout(() => copyBtn.setText("Copy Code"), 2000);
+    copyBtn.addEventListener("click", () => {
+      void (async () => {
+        await navigator.clipboard.writeText(this.code);
+        new Notice("Recovery code copied to clipboard!");
+        copyBtn.setText("Copied!");
+        window.setTimeout(() => copyBtn.setText("Copy Code"), 2000);
+      })();
     });
 
     const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
@@ -848,11 +877,11 @@ class AddPathModal extends Modal {
       this.close();
     };
 
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => { void submit(); });
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     pathInput.addEventListener("keydown", handleKey);
@@ -961,28 +990,32 @@ class EditPathModal extends Modal {
 
     const pwdBtn = pwdControls.createEl("button", { text: this.pathObj.passwordHash ? "Change Path Password" : "Set Path Password" });
     pwdBtn.addEventListener("click", () => {
-      new PasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", async (success, hash, salt) => {
-        if (success && hash && salt) {
-          this.pathObj.passwordHash = hash;
-          this.pathObj.passwordSalt = salt;
-          await this.plugin.saveSettings();
-          this.onSubmit(true);
-          this.close();
-        }
+      new PasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", (success, hash, salt) => {
+        void (async () => {
+          if (success && hash && salt) {
+            this.pathObj.passwordHash = hash;
+            this.pathObj.passwordSalt = salt;
+            await this.plugin.saveSettings();
+            this.onSubmit(true);
+            this.close();
+          }
+        })();
       }).open();
     });
 
     if (this.pathObj.passwordHash) {
       const rmPwdBtn = pwdControls.createEl("button", { text: "Remove Path Password", cls: "mod-warning" });
       rmPwdBtn.addEventListener("click", () => {
-        new ConfirmPasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", async (success) => {
-          if (success) {
-            this.pathObj.passwordHash = undefined;
-            this.pathObj.passwordSalt = undefined;
-            await this.plugin.saveSettings();
-            this.onSubmit(true);
-            this.close();
-          }
+        new ConfirmPasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", (success) => {
+          void (async () => {
+            if (success) {
+              this.pathObj.passwordHash = undefined;
+              this.pathObj.passwordSalt = undefined;
+              await this.plugin.saveSettings();
+              this.onSubmit(true);
+              this.close();
+            }
+          })();
         }).open();
       });
     }
@@ -1017,13 +1050,13 @@ class EditPathModal extends Modal {
       this.close();
     };
 
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => { void submit(); });
     cancelBtn.addEventListener("click", () => this.close());
     
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     labelInput.addEventListener("keydown", handleKey);

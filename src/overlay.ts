@@ -185,7 +185,7 @@ export class LockOverlay {
       this.openRecoveryBypassModal();
     });
 
-    this.submitBtnEl.addEventListener("click", () => this.submit());
+    this.submitBtnEl.addEventListener("click", () => { void this.submit(); });
 
     // Stop all keydown bubble events from leaving the overlay container to Obsidian
     this.containerEl.addEventListener("keydown", (e) => {
@@ -256,7 +256,7 @@ export class LockOverlay {
       if (isRecoveryModalOpen) {
         return;
       }
-      this.submit();
+      void this.submit();
       return;
     }
 
@@ -418,11 +418,13 @@ export class LockOverlay {
       return;
     }
     this.isRecoveryPromptOpen = true;
-    new RecoveryBypassModal(this.app, this.settings, async (verified: boolean) => {
-      if (verified) {
-        new Notice("🔓 Lockout bypassed using Recovery Code.", 5000);
-        await this.handleSuccessfulUnlock();
-      }
+    new RecoveryBypassModal(this.app, this.settings, (verified: boolean) => {
+      void (async () => {
+        if (verified) {
+          new Notice("🔓 Lockout bypassed using Recovery Code.", 5000);
+          await this.handleSuccessfulUnlock();
+        }
+      })();
     }, () => {
       this.isRecoveryPromptOpen = false;
     }).open();
@@ -582,12 +584,12 @@ class RecoveryBypassModal extends Modal {
       }
     };
 
-    unlockBtn.addEventListener("click", attempt);
+    unlockBtn.addEventListener("click", () => { void attempt(); });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        attempt();
+        void attempt();
       }
     });
 

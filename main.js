@@ -577,7 +577,9 @@ var LockOverlay = class {
       e.preventDefault();
       this.openRecoveryBypassModal();
     });
-    this.submitBtnEl.addEventListener("click", () => this.submit());
+    this.submitBtnEl.addEventListener("click", () => {
+      void this.submit();
+    });
     this.containerEl.addEventListener("keydown", (e) => {
       e.stopPropagation();
     });
@@ -632,7 +634,7 @@ var LockOverlay = class {
       if (isRecoveryModalOpen) {
         return;
       }
-      this.submit();
+      void this.submit();
       return;
     }
     if (e.key === "Escape") {
@@ -775,11 +777,13 @@ var LockOverlay = class {
       return;
     }
     this.isRecoveryPromptOpen = true;
-    new RecoveryBypassModal(this.app, this.settings, async (verified) => {
-      if (verified) {
-        new import_obsidian2.Notice("\u{1F513} Lockout bypassed using Recovery Code.", 5e3);
-        await this.handleSuccessfulUnlock();
-      }
+    new RecoveryBypassModal(this.app, this.settings, (verified) => {
+      void (async () => {
+        if (verified) {
+          new import_obsidian2.Notice("\u{1F513} Lockout bypassed using Recovery Code.", 5e3);
+          await this.handleSuccessfulUnlock();
+        }
+      })();
     }, () => {
       this.isRecoveryPromptOpen = false;
     }).open();
@@ -911,12 +915,14 @@ var RecoveryBypassModal = class extends import_obsidian2.Modal {
         new import_obsidian2.Notice("\u274C Invalid Recovery Code.", 4e3);
       }
     };
-    unlockBtn.addEventListener("click", attempt);
+    unlockBtn.addEventListener("click", () => {
+      void attempt();
+    });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
         e.stopPropagation();
-        attempt();
+        void attempt();
       }
     });
     cancelBtn.addEventListener("click", () => {
@@ -942,7 +948,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    new import_obsidian3.Setting(containerEl).setName("General").setHeading();
+    new import_obsidian3.Setting(containerEl).setName("Core").setHeading();
     new import_obsidian3.Setting(containerEl).setName("Enable StoneGate").setDesc("Turn on lock screen protection").addToggle((toggle) => {
       let isSyncing = false;
       toggle.setValue(this.plugin.settings.enabled).onChange((value) => {
@@ -955,22 +961,24 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
                 isSyncing = true;
                 toggle.setValue(false);
                 isSyncing = false;
-                new PasswordModal(this.app, this.plugin, void 0, void 0, "Master Password", async (success, hash, salt) => {
-                  try {
-                    if (success && hash && salt) {
-                      this.plugin.settings.passwordHash = hash;
-                      this.plugin.settings.passwordSalt = salt;
-                      this.plugin.settings.enabled = true;
-                      await this.plugin.saveSettings();
-                      this.display();
-                    } else {
-                      isSyncing = true;
-                      toggle.setValue(false);
-                      isSyncing = false;
+                new PasswordModal(this.app, this.plugin, void 0, void 0, "Master Password", (success, hash, salt) => {
+                  void (async () => {
+                    try {
+                      if (success && hash && salt) {
+                        this.plugin.settings.passwordHash = hash;
+                        this.plugin.settings.passwordSalt = salt;
+                        this.plugin.settings.enabled = true;
+                        await this.plugin.saveSettings();
+                        this.display();
+                      } else {
+                        isSyncing = true;
+                        toggle.setValue(false);
+                        isSyncing = false;
+                      }
+                    } catch (e) {
+                      console.error("Password modal callback error:", e);
                     }
-                  } catch (e) {
-                    console.error("Password modal callback error:", e);
-                  }
+                  })();
                 }).open();
               } else {
                 this.plugin.settings.enabled = true;
@@ -980,21 +988,23 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
               isSyncing = true;
               toggle.setValue(true);
               isSyncing = false;
-              new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-                try {
-                  if (success) {
-                    this.plugin.settings.enabled = false;
-                    await this.plugin.saveSettings();
-                    this.plugin.lockManager.lockAll();
-                    this.display();
-                  } else {
-                    isSyncing = true;
-                    toggle.setValue(true);
-                    isSyncing = false;
+              new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success) => {
+                void (async () => {
+                  try {
+                    if (success) {
+                      this.plugin.settings.enabled = false;
+                      await this.plugin.saveSettings();
+                      this.plugin.lockManager.lockAll();
+                      this.display();
+                    } else {
+                      isSyncing = true;
+                      toggle.setValue(true);
+                      isSyncing = false;
+                    }
+                  } catch (e) {
+                    console.error("Confirm password modal callback error:", e);
                   }
-                } catch (e) {
-                  console.error("Confirm password modal callback error:", e);
-                }
+                })();
               }).open();
             }
           } catch (e) {
@@ -1011,44 +1021,52 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
     if (this.plugin.settings.passwordHash) {
       passwordSetting.addButton(
         (btn) => btn.setButtonText("Change Password").onClick(() => {
-          new PasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success, hash, salt) => {
-            if (success && hash && salt) {
-              this.plugin.settings.passwordHash = hash;
-              this.plugin.settings.passwordSalt = salt;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new PasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success, hash, salt) => {
+            void (async () => {
+              if (success && hash && salt) {
+                this.plugin.settings.passwordHash = hash;
+                this.plugin.settings.passwordSalt = salt;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         })
       ).addButton((btn) => {
+        var _a;
         btn.setButtonText("Remove");
-        if (typeof btn.setDestructive === "function") {
-          btn.setDestructive();
+        const dBtn = btn;
+        if (typeof dBtn.setDestructive === "function") {
+          dBtn.setDestructive();
         } else {
-          btn["setWarning"]();
+          (_a = dBtn["setWarning"]) == null ? void 0 : _a.call(dBtn);
         }
         btn.onClick(() => {
-          new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-            if (success) {
-              this.plugin.settings.passwordHash = void 0;
-              this.plugin.settings.passwordSalt = void 0;
-              this.plugin.settings.enabled = false;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", (success) => {
+            void (async () => {
+              if (success) {
+                this.plugin.settings.passwordHash = void 0;
+                this.plugin.settings.passwordSalt = void 0;
+                this.plugin.settings.enabled = false;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         });
       });
     } else {
       passwordSetting.addButton(
         (btn) => btn.setButtonText("Set Password").setCta().onClick(() => {
-          new PasswordModal(this.app, this.plugin, void 0, void 0, "Master Password", async (success, hash, salt) => {
-            if (success && hash && salt) {
-              this.plugin.settings.passwordHash = hash;
-              this.plugin.settings.passwordSalt = salt;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new PasswordModal(this.app, this.plugin, void 0, void 0, "Master Password", (success, hash, salt) => {
+            void (async () => {
+              if (success && hash && salt) {
+                this.plugin.settings.passwordHash = hash;
+                this.plugin.settings.passwordSalt = salt;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         })
       );
@@ -1144,43 +1162,51 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
     if (this.plugin.settings.unlockMenuPasswordHash) {
       unlockMenuPwdSetting.addButton(
         (btn) => btn.setButtonText("Change Password").onClick(() => {
-          new PasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success, hash, salt) => {
-            if (success && hash && salt) {
-              this.plugin.settings.unlockMenuPasswordHash = hash;
-              this.plugin.settings.unlockMenuPasswordSalt = salt;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new PasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", (success, hash, salt) => {
+            void (async () => {
+              if (success && hash && salt) {
+                this.plugin.settings.unlockMenuPasswordHash = hash;
+                this.plugin.settings.unlockMenuPasswordSalt = salt;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         })
       ).addButton((btn) => {
+        var _a;
         btn.setButtonText("Remove");
-        if (typeof btn.setDestructive === "function") {
-          btn.setDestructive();
+        const dBtn = btn;
+        if (typeof dBtn.setDestructive === "function") {
+          dBtn.setDestructive();
         } else {
-          btn["setWarning"]();
+          (_a = dBtn["setWarning"]) == null ? void 0 : _a.call(dBtn);
         }
         btn.onClick(() => {
-          new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
-            if (success) {
-              this.plugin.settings.unlockMenuPasswordHash = void 0;
-              this.plugin.settings.unlockMenuPasswordSalt = void 0;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", (success) => {
+            void (async () => {
+              if (success) {
+                this.plugin.settings.unlockMenuPasswordHash = void 0;
+                this.plugin.settings.unlockMenuPasswordSalt = void 0;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         });
       });
     } else {
       unlockMenuPwdSetting.addButton(
         (btn) => btn.setButtonText("Set Password").setCta().onClick(() => {
-          new PasswordModal(this.app, this.plugin, void 0, void 0, "Unlock Menu Password", async (success, hash, salt) => {
-            if (success && hash && salt) {
-              this.plugin.settings.unlockMenuPasswordHash = hash;
-              this.plugin.settings.unlockMenuPasswordSalt = salt;
-              await this.plugin.saveSettings();
-              this.display();
-            }
+          new PasswordModal(this.app, this.plugin, void 0, void 0, "Unlock Menu Password", (success, hash, salt) => {
+            void (async () => {
+              if (success && hash && salt) {
+                this.plugin.settings.unlockMenuPasswordHash = hash;
+                this.plugin.settings.unlockMenuPasswordSalt = salt;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            })();
           }).open();
         })
       );
@@ -1195,11 +1221,13 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
     const recoverySetting = new import_obsidian3.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
     if (this.plugin.settings.recoveryCodeHash) {
       recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton((btn) => {
+        var _a;
         btn.setButtonText("Remove Recovery Code");
-        if (typeof btn.setDestructive === "function") {
-          btn.setDestructive();
+        const dBtn = btn;
+        if (typeof dBtn.setDestructive === "function") {
+          dBtn.setDestructive();
         } else {
-          btn["setWarning"]();
+          (_a = dBtn["setWarning"]) == null ? void 0 : _a.call(dBtn);
         }
         btn.onClick(() => {
           new ConfirmPasswordModal(
@@ -1208,14 +1236,16 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
             void 0,
             void 0,
             "Master Password",
-            async (success) => {
-              if (success) {
-                this.plugin.settings.recoveryCodeHash = void 0;
-                this.plugin.settings.recoveryCodeSalt = void 0;
-                await this.plugin.saveSettings();
-                this.display();
-                new import_obsidian3.Notice("Recovery Code removed successfully.");
-              }
+            (success) => {
+              void (async () => {
+                if (success) {
+                  this.plugin.settings.recoveryCodeHash = void 0;
+                  this.plugin.settings.recoveryCodeSalt = void 0;
+                  await this.plugin.saveSettings();
+                  this.display();
+                  new import_obsidian3.Notice("Recovery Code removed successfully.");
+                }
+              })();
             }
           ).open();
         });
@@ -1229,17 +1259,19 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
             void 0,
             void 0,
             "Master Password",
-            async (success) => {
-              if (success) {
-                const code = generateRecoveryCode();
-                const saltBytes = generateSalt();
-                const hash = await hashPassword(code.toUpperCase(), saltBytes);
-                this.plugin.settings.recoveryCodeHash = hash;
-                this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
-                await this.plugin.saveSettings();
-                this.display();
-                new RecoveryCodeDisplayModal(this.app, code).open();
-              }
+            (success) => {
+              void (async () => {
+                if (success) {
+                  const code = generateRecoveryCode();
+                  const saltBytes = generateSalt();
+                  const hash = await hashPassword(code.toUpperCase(), saltBytes);
+                  this.plugin.settings.recoveryCodeHash = hash;
+                  this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
+                  await this.plugin.saveSettings();
+                  this.display();
+                  new RecoveryCodeDisplayModal(this.app, code).open();
+                }
+              })();
             }
           ).open();
         })
@@ -1299,7 +1331,8 @@ var PasswordModal = class extends import_obsidian3.Modal {
       }
       const p1 = newPasswordInput.value;
       const p2 = confirmPasswordInput.value;
-      if (!p1 || p1.length < 4 || !/^[\u0000-\u007F]*$/.test(p1)) {
+      const asciiRegex = new RegExp("^[" + String.fromCharCode(0) + "-\\u007F]*$");
+      if (!p1 || p1.length < 4 || !asciiRegex.test(p1)) {
         errorEl.textContent = "Password must be at least 4 ASCII characters.";
         return;
       }
@@ -1312,11 +1345,13 @@ var PasswordModal = class extends import_obsidian3.Modal {
       this.onSubmit(true, hash, uint8ArrayToBase64(salt));
       this.close();
     };
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => {
+      void submit();
+    });
     const handleKey = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     newPasswordInput.addEventListener("keydown", handleKey);
@@ -1376,11 +1411,13 @@ var ConfirmPasswordModal = class extends import_obsidian3.Modal {
         input.setCssStyles({ borderColor: "#e05555" });
       }
     };
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => {
+      void submit();
+    });
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     });
     window.setTimeout(() => input.focus(), 50);
@@ -1414,11 +1451,13 @@ var RecoveryCodeDisplayModal = class extends import_obsidian3.Modal {
     codeContainer.createEl("div", { text: this.code, cls: "sg-display-code-el" });
     const buttonRow = contentEl.createDiv("sg-button-row sg-display-button-row");
     const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
-    copyBtn.addEventListener("click", async () => {
-      await navigator.clipboard.writeText(this.code);
-      new import_obsidian3.Notice("Recovery code copied to clipboard!");
-      copyBtn.setText("Copied!");
-      window.setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
+    copyBtn.addEventListener("click", () => {
+      void (async () => {
+        await navigator.clipboard.writeText(this.code);
+        new import_obsidian3.Notice("Recovery code copied to clipboard!");
+        copyBtn.setText("Copied!");
+        window.setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
+      })();
     });
     const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
     closeBtn.addEventListener("click", () => {
@@ -1549,11 +1588,13 @@ var AddPathModal = class extends import_obsidian3.Modal {
       this.onSubmit(true);
       this.close();
     };
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => {
+      void submit();
+    });
     const handleKey = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     pathInput.addEventListener("keydown", handleKey);
@@ -1632,27 +1673,31 @@ var EditPathModal = class extends import_obsidian3.Modal {
     const pwdControls = contentEl.createDiv("sg-modal-button-row-left");
     const pwdBtn = pwdControls.createEl("button", { text: this.pathObj.passwordHash ? "Change Path Password" : "Set Path Password" });
     pwdBtn.addEventListener("click", () => {
-      new PasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", async (success, hash, salt) => {
-        if (success && hash && salt) {
-          this.pathObj.passwordHash = hash;
-          this.pathObj.passwordSalt = salt;
-          await this.plugin.saveSettings();
-          this.onSubmit(true);
-          this.close();
-        }
+      new PasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", (success, hash, salt) => {
+        void (async () => {
+          if (success && hash && salt) {
+            this.pathObj.passwordHash = hash;
+            this.pathObj.passwordSalt = salt;
+            await this.plugin.saveSettings();
+            this.onSubmit(true);
+            this.close();
+          }
+        })();
       }).open();
     });
     if (this.pathObj.passwordHash) {
       const rmPwdBtn = pwdControls.createEl("button", { text: "Remove Path Password", cls: "mod-warning" });
       rmPwdBtn.addEventListener("click", () => {
-        new ConfirmPasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", async (success) => {
-          if (success) {
-            this.pathObj.passwordHash = void 0;
-            this.pathObj.passwordSalt = void 0;
-            await this.plugin.saveSettings();
-            this.onSubmit(true);
-            this.close();
-          }
+        new ConfirmPasswordModal(this.app, this.plugin, this.pathObj.passwordHash, this.pathObj.passwordSalt, "Path Password", (success) => {
+          void (async () => {
+            if (success) {
+              this.pathObj.passwordHash = void 0;
+              this.pathObj.passwordSalt = void 0;
+              await this.plugin.saveSettings();
+              this.onSubmit(true);
+              this.close();
+            }
+          })();
         }).open();
       });
     }
@@ -1679,12 +1724,14 @@ var EditPathModal = class extends import_obsidian3.Modal {
       this.onSubmit(true);
       this.close();
     };
-    submitBtn.addEventListener("click", submit);
+    submitBtn.addEventListener("click", () => {
+      void submit();
+    });
     cancelBtn.addEventListener("click", () => this.close());
     const handleKey = (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
-        submit();
+        void submit();
       }
     };
     labelInput.addEventListener("keydown", handleKey);
