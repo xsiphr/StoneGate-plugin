@@ -1,4 +1,4 @@
-import { App } from "obsidian";
+import { App, Modal, Notice } from "obsidian";
 import { StoneGateSettings, ProtectedPath } from "./types";
 import { verifyPassword } from "./crypto";
 
@@ -13,6 +13,7 @@ export class LockOverlay {
   private errorEl: HTMLElement | null = null;
   private counterEl: HTMLElement | null = null;
   private lockoutEl: HTMLElement | null = null;
+  private recoveryBypassEl: HTMLElement | null = null;
   private appNameEl: HTMLElement | null = null;
   private titleEl: HTMLElement | null = null;
   private hintEl: HTMLElement | null = null;
@@ -20,16 +21,17 @@ export class LockOverlay {
   private currentCallback: UnlockCallback | null = null;
   private currentPath: ProtectedPath | null = null;
   private previousFile: string | null = null;
-  private failedAttempts = 0;
-  private lockoutUntil = 0;
   private lockoutTimer: number | null = null;
+  private saveSettings: () => Promise<void>;
 
   private boundHandleKeydown = this.handleKeydown.bind(this);
   private observer: MutationObserver | null = null;
+  private isRecoveryPromptOpen = false;
 
-  constructor(app: App, settings: StoneGateSettings) {
+  constructor(app: App, settings: StoneGateSettings, saveSettings: () => Promise<void>) {
     this.app = app;
     this.settings = settings;
+    this.saveSettings = saveSettings;
     this.createOverlay();
   }
 
@@ -76,7 +78,24 @@ export class LockOverlay {
     this.counterEl = card.createDiv("sg-counter");
     this.lockoutEl = card.createDiv("sg-lockout");
 
+    // Recovery bypass link — always in DOM, toggled via display style
+    this.recoveryBypassEl = card.createDiv("sg-recovery-bypass");
+    this.recoveryBypassEl.style.display = "none";
+    const recoveryLink = this.recoveryBypassEl.createEl("a", {
+      text: "Use Recovery Code",
+      cls: "sg-recovery-link"
+    });
+    recoveryLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openRecoveryBypassModal();
+    });
+
     this.submitBtnEl.addEventListener("click", () => this.submit());
+
+    // Stop all keydown bubble events from leaving the overlay container to Obsidian
+    this.containerEl.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+    });
 
     document.body.appendChild(this.containerEl);
 
@@ -86,7 +105,6 @@ export class LockOverlay {
         if (mutation.type === "childList") {
           const removedNodes = Array.from(mutation.removedNodes);
           if (this.containerEl && removedNodes.includes(this.containerEl)) {
-            // It was removed, but it shouldn't be unless disposed
             document.body.appendChild(this.containerEl);
           }
         }
@@ -112,8 +130,9 @@ export class LockOverlay {
       return;
     }
 
-    // Force focus to input if user starts typing
-    if (this.inputEl && document.activeElement !== this.inputEl) {
+    // Force focus to input if user starts typing (but not during lockout)
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+    if (!isLockedOut && this.inputEl && document.activeElement !== this.inputEl) {
       this.inputEl.focus();
     }
   }
@@ -127,6 +146,7 @@ export class LockOverlay {
     
     if (this.settings.showStoneGateTitle) {
       this.appNameEl!.style.display = "block";
+      this.appNameEl!.textContent = this.settings.customTitle || "StoneGate";
     } else {
       this.appNameEl!.style.display = "none";
     }
@@ -135,9 +155,9 @@ export class LockOverlay {
     
     let hintText = "";
     if (path.showHint && path.passwordHint) {
-        hintText = `Hint: ${path.passwordHint}`;
+        hintText = path.passwordHint;
     } else if (!path.passwordHash && this.settings.showMasterHint && this.settings.passwordHint) {
-        hintText = `Hint: ${this.settings.passwordHint}`;
+        hintText = this.settings.passwordHint;
     }
     this.hintEl!.textContent = hintText;
 
@@ -157,8 +177,10 @@ export class LockOverlay {
       this.errorEl!.textContent = "";
       this.updateLockoutUI();
       
-      if (!this.lockoutUntil || Date.now() > this.lockoutUntil) {
-        setTimeout(() => this.inputEl?.focus(), 100);
+      if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
+        this.startLockoutTimer();
+      } else {
+        setTimeout(() => this.inputEl?.focus(), 50);
       }
     }
   }
@@ -183,6 +205,22 @@ export class LockOverlay {
     }, 300); // match animation duration
   }
 
+  private async handleSuccessfulUnlock() {
+    if (this.settings.intruderAlert && this.settings.totalIntruderAttempts > 0) {
+      new Notice(
+        `🚨 Security Alert: ${this.settings.totalIntruderAttempts} failed unlock attempt(s) detected.`,
+        10000
+      );
+    }
+    this.settings.failedAttempts = 0;
+    this.settings.totalIntruderAttempts = 0;
+    this.settings.lockoutUntil = 0;
+    await this.saveSettings();
+    this.updateLockoutUI();
+    this.hide();
+    if (this.currentCallback) this.currentCallback(true);
+  }
+
   private async submit() {
     const hash = this.currentPath?.passwordHash || this.settings.passwordHash;
     const salt = this.currentPath?.passwordSalt || this.settings.passwordSalt;
@@ -193,57 +231,91 @@ export class LockOverlay {
       return;
     }
 
-    if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+    if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
       return;
     }
 
     const guess = this.inputEl.value;
     this.inputEl.value = "";
 
-    // Check actual password
-    const isMatch = await verifyPassword(guess, hash, salt);
+    let isMatch = await verifyPassword(guess, hash, salt);
+
+    if (!isMatch && this.settings.recoveryCodeHash && this.settings.recoveryCodeSalt) {
+      const upperGuess = guess.trim().toUpperCase();
+      isMatch = await verifyPassword(upperGuess, this.settings.recoveryCodeHash, this.settings.recoveryCodeSalt);
+      if (isMatch) {
+        new Notice("🔓 Unlocked using Recovery Code (Global Skeleton Key).", 5000);
+      }
+    }
     
     if (isMatch) {
-      this.failedAttempts = 0;
-      this.updateLockoutUI();
-      this.hide();
-      if (this.currentCallback) this.currentCallback(true);
+      await this.handleSuccessfulUnlock();
     } else {
-      this.failedAttempts++;
+      this.settings.failedAttempts++;
+      this.settings.totalIntruderAttempts++;
       this.errorEl!.textContent = "Incorrect password";
       
       this.inputEl.classList.remove("sg-shake");
       void this.inputEl.offsetWidth; // trigger reflow
       this.inputEl.classList.add("sg-shake");
 
-      if (this.settings.maxFailedAttempts > 0 && this.failedAttempts >= this.settings.maxFailedAttempts) {
-        this.lockoutUntil = Date.now() + this.settings.lockoutDurationSeconds * 1000;
-        this.failedAttempts = 0;
+      if (this.settings.maxFailedAttempts > 0 && this.settings.failedAttempts >= this.settings.maxFailedAttempts) {
+        this.settings.lockoutUntil = Date.now() + this.settings.lockoutDurationSeconds * 1000;
+        this.settings.failedAttempts = 0;
+        await this.saveSettings();
         this.updateLockoutUI();
         this.startLockoutTimer();
       } else {
+        await this.saveSettings();
         this.updateLockoutUI();
       }
     }
   }
 
+  private openRecoveryBypassModal() {
+    if (this.isRecoveryPromptOpen) return;
+    if (!this.settings.recoveryCodeHash || !this.settings.recoveryCodeSalt) {
+      new Notice("No Recovery Code is configured. Set one up in StoneGate settings.", 6000);
+      return;
+    }
+    this.isRecoveryPromptOpen = true;
+    new RecoveryBypassModal(this.app, this.settings, async (verified: boolean) => {
+      if (verified) {
+        new Notice("🔓 Lockout bypassed using Recovery Code.", 5000);
+        await this.handleSuccessfulUnlock();
+      }
+    }, () => {
+      this.isRecoveryPromptOpen = false;
+    }).open();
+  }
+
   private updateLockoutUI() {
-    if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+
+    if (isLockedOut) {
       this.inputEl!.disabled = true;
       this.submitBtnEl!.disabled = true;
       this.errorEl!.textContent = "";
       this.counterEl!.textContent = "";
       
-      const secondsLeft = Math.ceil((this.lockoutUntil - Date.now()) / 1000);
+      const secondsLeft = Math.ceil((this.settings.lockoutUntil - Date.now()) / 1000);
       this.lockoutEl!.textContent = `Locked out for ${secondsLeft} seconds`;
+
+      if (this.settings.recoveryCodeHash) {
+        this.recoveryBypassEl!.style.display = "block";
+      }
     } else {
-      this.lockoutUntil = 0;
+      if (this.settings.lockoutUntil !== 0) {
+        this.settings.lockoutUntil = 0;
+        this.saveSettings().catch(err => console.error("StoneGate: failed to save lockout settings", err));
+      }
       this.inputEl!.disabled = false;
       this.submitBtnEl!.disabled = false;
       this.lockoutEl!.textContent = "";
+      this.recoveryBypassEl!.style.display = "none";
       
-      if (this.settings.maxFailedAttempts > 0 && this.failedAttempts > 0) {
-        this.counterEl!.textContent = `${this.failedAttempts} / ${this.settings.maxFailedAttempts} attempts`;
+      if (this.settings.maxFailedAttempts > 0 && this.settings.failedAttempts > 0) {
+        this.counterEl!.textContent = `${this.settings.failedAttempts} / ${this.settings.maxFailedAttempts} attempts`;
       } else {
         this.counterEl!.textContent = "";
       }
@@ -256,7 +328,7 @@ export class LockOverlay {
     }
     
     this.lockoutTimer = window.setInterval(() => {
-      if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+      if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
         this.updateLockoutUI();
       } else {
         window.clearInterval(this.lockoutTimer!);
@@ -279,6 +351,136 @@ export class LockOverlay {
     document.removeEventListener("keydown", this.boundHandleKeydown, true);
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.parentNode.removeChild(this.containerEl);
+    }
+  }
+}
+
+class RecoveryBypassModal extends Modal {
+  private settings: StoneGateSettings;
+  private onResult: (verified: boolean) => void;
+  private onCloseCallback?: () => void;
+
+  constructor(app: App, settings: StoneGateSettings, onResult: (verified: boolean) => void, onCloseCallback?: () => void) {
+    super(app);
+    this.settings = settings;
+    this.onResult = onResult;
+    this.onCloseCallback = onCloseCallback;
+  }
+
+  onOpen() {
+    this.containerEl.addClass("sg-recovery-modal-container");
+    this.containerEl.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+    });
+
+    const { contentEl } = this;
+    contentEl.empty();
+
+    contentEl.createEl("h2", { text: "🔑 Emergency Recovery Bypass" });
+
+    const desc = contentEl.createEl("p", {
+      text: "You are currently locked out. Enter your 6-character Recovery Code to immediately bypass the lockout and unlock."
+    });
+    desc.style.marginBottom = "16px";
+    desc.style.color = "var(--text-muted)";
+    desc.style.fontSize = "0.9em";
+
+    const inputWrapper = contentEl.createDiv();
+    inputWrapper.style.position = "relative";
+
+    const input = inputWrapper.createEl("input", {
+      type: "text",
+      attr: {
+        placeholder: "e.g. AB3X7K",
+        maxlength: "6",
+        autocomplete: "off",
+        spellcheck: "false"
+      }
+    });
+    input.style.width = "100%";
+    input.style.textTransform = "uppercase";
+    input.style.letterSpacing = "4px";
+    input.style.textAlign = "center";
+    input.style.fontSize = "1.4em";
+    input.style.fontFamily = "monospace";
+    input.style.padding = "10px 14px";
+    input.style.boxSizing = "border-box";
+    input.style.marginBottom = "12px";
+
+    input.addEventListener("input", () => {
+      const pos = input.selectionStart ?? input.value.length;
+      input.value = input.value.toUpperCase();
+      input.setSelectionRange(pos, pos);
+    });
+
+    const errorEl = contentEl.createDiv();
+    errorEl.style.color = "var(--text-error)";
+    errorEl.style.fontSize = "0.85em";
+    errorEl.style.marginBottom = "16px";
+    errorEl.style.minHeight = "1.2em";
+
+    const btnRow = contentEl.createDiv();
+    btnRow.style.display = "flex";
+    btnRow.style.gap = "10px";
+    btnRow.style.justifyContent = "flex-end";
+
+    const cancelBtn = btnRow.createEl("button", { text: "Cancel" });
+    const unlockBtn = btnRow.createEl("button", { text: "Use Recovery Code", cls: "mod-cta" });
+    unlockBtn.style.marginTop = "0";
+
+    let submitted = false;
+
+    const attempt = async () => {
+      if (submitted) return;
+      errorEl.textContent = "";
+
+      const code = input.value.trim().toUpperCase();
+      if (!code) {
+        errorEl.textContent = "Please enter your Recovery Code.";
+        return;
+      }
+
+      unlockBtn.disabled = true;
+      unlockBtn.textContent = "Verifying…";
+
+      const isMatch = await verifyPassword(
+        code,
+        this.settings.recoveryCodeHash!,
+        this.settings.recoveryCodeSalt!
+      );
+
+      if (isMatch) {
+        submitted = true;
+        this.close();
+        this.onResult(true);
+      } else {
+        unlockBtn.disabled = false;
+        unlockBtn.textContent = "Use Recovery Code";
+        errorEl.textContent = "Invalid Recovery Code. Please check and try again.";
+        input.value = "";
+        new Notice("❌ Invalid Recovery Code.", 4000);
+      }
+    };
+
+    unlockBtn.addEventListener("click", attempt);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        attempt();
+      }
+    });
+
+    cancelBtn.addEventListener("click", () => {
+      this.close();
+    });
+
+    setTimeout(() => input.focus(), 80);
+  }
+
+  onClose() {
+    this.contentEl.empty();
+    if (this.onCloseCallback) {
+      this.onCloseCallback();
     }
   }
 }

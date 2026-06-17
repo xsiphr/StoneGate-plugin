@@ -45,19 +45,24 @@ const context = await esbuild.context({
       setup(build) {
         build.onEnd((result) => {
           if (result.errors.length === 0) {
-            const destDir = path.resolve(process.cwd(), "../StoneGate-plugin");
-            if (!fs.existsSync(destDir)) {
-              fs.mkdirSync(destDir, { recursive: true });
-            }
-            try {
-              fs.copyFileSync("main.js", path.join(destDir, "main.js"));
-              fs.copyFileSync("manifest.json", path.join(destDir, "manifest.json"));
-              if (fs.existsSync("styles.css")) {
-                fs.copyFileSync("styles.css", path.join(destDir, "styles.css"));
+            const destinations = [
+              path.resolve(process.cwd(), "../StoneGate-plugin"),
+              "/home/xsip/Obsidian Hub/Testing/.obsidian/plugins/StoneGate-plugin"
+            ];
+            for (const destDir of destinations) {
+              if (!fs.existsSync(destDir)) {
+                fs.mkdirSync(destDir, { recursive: true });
               }
-              console.log("Successfully copied release files to StoneGate-plugin folder");
-            } catch (err) {
-              console.error("Failed to copy release files", err);
+              try {
+                fs.copyFileSync("main.js", path.join(destDir, "main.js"));
+                fs.copyFileSync("manifest.json", path.join(destDir, "manifest.json"));
+                if (fs.existsSync("styles.css")) {
+                  fs.copyFileSync("styles.css", path.join(destDir, "styles.css"));
+                }
+                console.log(`Successfully copied release files to ${destDir}`);
+              } catch (err) {
+                console.error(`Failed to copy release files to ${destDir}`, err);
+              }
             }
           }
         });

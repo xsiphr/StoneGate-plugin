@@ -8,6 +8,7 @@ export interface ProtectedPath {
   passwordSalt?: string;
   passwordHint?: string;
   showHint: boolean;
+  enableGhostMode?: boolean;
 }
 
 export interface StoneGateSettings {
@@ -18,7 +19,19 @@ export interface StoneGateSettings {
   showMasterHint: boolean;
   protectedPaths: ProtectedPath[];
   lockOnStartup: boolean;
+  lockOnBlur: boolean;
+  blurGracePeriodSeconds: number;
+  intruderAlert: boolean;
   maxFailedAttempts: number;   // 0 = unlimited
   lockoutDurationSeconds: number;
+  failedAttempts: number;
+  totalIntruderAttempts: number;
+  lockoutUntil: number;
+  recoveryCodeHash?: string;
+  recoveryCodeSalt?: string;
   showStoneGateTitle: boolean;
+  customTitle?: string;
+  unlockMenuPasswordHash?: string;
+  unlockMenuPasswordSalt?: string;
+  unlockMenuPasswordHint?: string;
 }

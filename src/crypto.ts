@@ -69,3 +69,14 @@ export async function verifyPassword(guess: string, storedHashBase64: string, st
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
   return arrayBufferToBase64(bytes.buffer);
 }
+
+export function generateRecoveryCode(): string {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const randomValues = new Uint8Array(6);
+  window.crypto.getRandomValues(randomValues);
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[randomValues[i] % chars.length];
+  }
+  return code;
+}

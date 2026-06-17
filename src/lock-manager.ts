@@ -14,12 +14,14 @@ export class LockManager {
   private previousFile: string | null = null;
   
   private idleTimerId: number | null = null;
+  private blurTimerId: number | null = null;
   private lastActivityTime = Date.now();
 
   private onStateChangeCallbacks: StateChangeCallback[] = [];
 
-  // Throttled listener references
   private boundActivityHandler = this.throttleActivity.bind(this);
+  private boundBlurHandler = this.handleWindowBlur.bind(this);
+  private boundFocusHandler = this.handleWindowFocus.bind(this);
 
   // Used for throttling activity updates (max once per second)
   private activityUpdatePending = false;
@@ -31,12 +33,14 @@ export class LockManager {
 
     this.setupListeners();
     this.startIdleChecker();
+    this.updateGhostModeStyles();
   }
 
   updateSettings(settings: StoneGateSettings) {
     this.settings = settings;
     // Check if any paths should lock due to new settings
     this.checkTimeouts();
+    this.updateGhostModeStyles();
   }
 
   private setupListeners() {
@@ -44,6 +48,8 @@ export class LockManager {
     document.addEventListener("keydown", this.boundActivityHandler);
     document.addEventListener("mousedown", this.boundActivityHandler);
     document.addEventListener("touchstart", this.boundActivityHandler);
+    window.addEventListener("blur", this.boundBlurHandler);
+    window.addEventListener("focus", this.boundFocusHandler);
   }
 
   private throttleActivity() {
@@ -165,16 +171,19 @@ export class LockManager {
       pathObj.lastUnlocked = now;
     }
     this.notifyStateChange(false);
+    this.updateGhostModeStyles();
   }
 
   public lock(pathId: string) {
     this.unlockedPaths.delete(pathId);
     this.notifyStateChange(true);
+    this.updateGhostModeStyles();
   }
 
   public lockAll() {
     this.unlockedPaths.clear();
     this.notifyStateChange(true);
+    this.updateGhostModeStyles();
   }
 
   public onLockStateChange(callback: StateChangeCallback) {
@@ -189,8 +198,86 @@ export class LockManager {
 
   public handleFileOpen(file: TAbstractFile | null) {
     if (!file) return;
+    // Navigating between files counts as user activity
+    this.lastActivityTime = Date.now();
     if (this.isLocked(file.path)) {
       this.triggerLock(file.path);
+    }
+  }
+
+  private handleWindowBlur() {
+    if (!this.settings.enabled || !this.settings.lockOnBlur) return;
+    
+    if (this.blurTimerId !== null) {
+      window.clearTimeout(this.blurTimerId);
+    }
+    
+    const gracePeriod = this.settings.blurGracePeriodSeconds ?? 3;
+    if (gracePeriod <= 0) {
+      this.executeBlurLock();
+    } else {
+      this.blurTimerId = window.setTimeout(() => {
+        this.executeBlurLock();
+        this.blurTimerId = null;
+      }, gracePeriod * 1000);
+    }
+  }
+
+  private handleWindowFocus() {
+    if (this.blurTimerId !== null) {
+      window.clearTimeout(this.blurTimerId);
+      this.blurTimerId = null;
+    }
+  }
+
+  private executeBlurLock() {
+    // Lock all paths
+    this.lockAll();
+    
+    // If there is an active file, trigger the lock overlay so it is ready when they return
+    const currentFile = this.app.workspace.getActiveFile();
+    if (currentFile) {
+      this.triggerLock(currentFile.path);
+    } else {
+      // If no active file but we locked everything, trigger lock on the default path
+      const defaultPath = this.settings.protectedPaths.find(p => p.id === "default" || p.path === "/");
+      if (defaultPath && (defaultPath.passwordHash || this.settings.passwordHash)) {
+        if (!this.overlay.isVisible()) {
+          this.overlay.show(defaultPath, this.previousFile, (success) => {
+            if (success) {
+              this.unlock(defaultPath.id);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  public updateGhostModeStyles() {
+    let styleEl = document.getElementById("stonegate-ghost-mode") as HTMLStyleElement;
+    if (!this.settings.enabled) {
+      if (styleEl) styleEl.remove();
+      return;
+    }
+
+    let css = "";
+    for (const path of this.settings.protectedPaths) {
+      if (path.path === "/" || path.path === "") continue; // Skip root path
+      if (path.enableGhostMode && this.isLocked(path.path)) {
+        const safePath = path.path.replace(/"/g, '\\"');
+        css += `.nav-folder:has(> .nav-folder-title[data-path="${safePath}"]), .nav-file:has(> .nav-file-title[data-path="${safePath}"]) { display: none !important; }\n`;
+      }
+    }
+
+    if (css) {
+      if (!styleEl) {
+        styleEl = document.createElement("style");
+        styleEl.id = "stonegate-ghost-mode";
+        document.head.appendChild(styleEl);
+      }
+      styleEl.textContent = css;
+    } else {
+      if (styleEl) styleEl.remove();
     }
   }
 
@@ -199,9 +286,17 @@ export class LockManager {
     document.removeEventListener("keydown", this.boundActivityHandler);
     document.removeEventListener("mousedown", this.boundActivityHandler);
     document.removeEventListener("touchstart", this.boundActivityHandler);
+    window.removeEventListener("blur", this.boundBlurHandler);
+    window.removeEventListener("focus", this.boundFocusHandler);
 
     if (this.idleTimerId !== null) {
       window.clearTimeout(this.idleTimerId);
     }
+    if (this.blurTimerId !== null) {
+      window.clearTimeout(this.blurTimerId);
+    }
+
+    const styleEl = document.getElementById("stonegate-ghost-mode");
+    if (styleEl) styleEl.remove();
   }
 }

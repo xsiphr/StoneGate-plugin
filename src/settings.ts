@@ -1,7 +1,7 @@
-import { App, Modal, PluginSettingTab, Setting, TFolder } from "obsidian";
+import { App, Modal, PluginSettingTab, Setting, TFolder, Notice } from "obsidian";
 import type StoneGatePlugin from "./main";
 import { ProtectedPath } from "./types";
-import { generateSalt, hashPassword, uint8ArrayToBase64, verifyPassword } from "./crypto";
+import { generateSalt, hashPassword, uint8ArrayToBase64, verifyPassword, generateRecoveryCode } from "./crypto";
 
 export class StoneGateSettingTab extends PluginSettingTab {
   plugin: StoneGatePlugin;
@@ -125,28 +125,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
             })
         );
 
-      new Setting(containerEl)
-        .setName("Master Password Hint")
-        .setDesc("Optional hint to show when master password is required")
-        .addText(text => text
-          .setPlaceholder("Hint text...")
-          .setValue(this.plugin.settings.passwordHint || "")
-          .onChange(async (val) => {
-            this.plugin.settings.passwordHint = val;
-            await this.plugin.saveSettings();
-          })
-        );
-        
-      new Setting(containerEl)
-        .setName("Show Master Hint")
-        .setDesc("Display the master hint on the lock screen")
-        .addToggle(toggle => toggle
-          .setValue(this.plugin.settings.showMasterHint)
-          .onChange(async (val) => {
-            this.plugin.settings.showMasterHint = val;
-            await this.plugin.saveSettings();
-          })
-        );
+
 
     } else {
       passwordSetting.addButton((btn) =>
@@ -218,6 +197,34 @@ export class StoneGateSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Lock when Obsidian loses focus")
+      .setDesc("Lock immediately when the window loses focus")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.lockOnBlur)
+          .onChange(async (value) => {
+            this.plugin.settings.lockOnBlur = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Blur Grace Period (seconds)")
+      .setDesc("Time in seconds to wait before locking after focus loss (0 = immediate)")
+      .addText((text) =>
+        text
+          .setPlaceholder("3")
+          .setValue(String(this.plugin.settings.blurGracePeriodSeconds))
+          .onChange(async (value) => {
+            const num = parseInt(value, 10);
+            if (!isNaN(num) && num >= 0) {
+              this.plugin.settings.blurGracePeriodSeconds = num;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Max Failed Attempts")
       .setDesc("0 = unlimited")
       .addText((text) =>
@@ -248,6 +255,20 @@ export class StoneGateSettingTab extends PluginSettingTab {
           })
       );
 
+    new Setting(containerEl)
+      .setName("Intruder Alert")
+      .setDesc("Show a notice upon unlocking if there were failed attempts")
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.intruderAlert)
+          .onChange(async (value) => {
+            this.plugin.settings.intruderAlert = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+
+
     containerEl.createEl("h3", { text: "Appearance" });
 
     new Setting(containerEl)
@@ -261,6 +282,150 @@ export class StoneGateSettingTab extends PluginSettingTab {
             await this.plugin.saveSettings();
           })
       );
+
+    new Setting(containerEl)
+      .setName("Custom Lock Screen Title")
+      .setDesc("Custom text to show at the top of the lock screen (defaults to 'StoneGate')")
+      .addText((text) =>
+        text
+          .setPlaceholder("StoneGate")
+          .setValue(this.plugin.settings.customTitle || "")
+          .onChange(async (value) => {
+            this.plugin.settings.customTitle = value.trim() || undefined;
+            await this.plugin.saveSettings();
+          })
+      );
+
+
+
+    containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
+
+    const unlockMenuPwdSetting = new Setting(containerEl)
+      .setName("Unlock Menu Access Password")
+      .setDesc("Used to access the command palette list of hidden/locked paths");
+
+    if (this.plugin.settings.unlockMenuPasswordHash) {
+      unlockMenuPwdSetting
+        .addButton((btn) =>
+          btn
+            .setButtonText("Change Password")
+            .onClick(() => {
+              new PasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success, hash, salt) => {
+                if (success && hash && salt) {
+                  this.plugin.settings.unlockMenuPasswordHash = hash;
+                  this.plugin.settings.unlockMenuPasswordSalt = salt;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              }).open();
+            })
+        )
+        .addButton((btn) =>
+          btn
+            .setButtonText("Remove")
+            .setWarning()
+            .onClick(() => {
+              new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
+                if (success) {
+                  this.plugin.settings.unlockMenuPasswordHash = undefined;
+                  this.plugin.settings.unlockMenuPasswordSalt = undefined;
+                  await this.plugin.saveSettings();
+                  this.display();
+                }
+              }).open();
+            })
+        );
+    } else {
+      unlockMenuPwdSetting.addButton((btn) =>
+        btn
+          .setButtonText("Set Password")
+          .setCta()
+          .onClick(() => {
+            new PasswordModal(this.app, this.plugin, undefined, undefined, "Unlock Menu Password", async (success, hash, salt) => {
+              if (success && hash && salt) {
+                this.plugin.settings.unlockMenuPasswordHash = hash;
+                this.plugin.settings.unlockMenuPasswordSalt = salt;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            }).open();
+          })
+      );
+    }
+
+    new Setting(containerEl)
+      .setName("Unlock Menu Password Hint")
+      .setDesc("Hint shown when the Unlock Menu password is requested")
+      .addText((text) =>
+        text
+          .setPlaceholder("Hint or custom message...")
+          .setValue(this.plugin.settings.unlockMenuPasswordHint || "")
+          .onChange(async (value) => {
+            this.plugin.settings.unlockMenuPasswordHint = value.trim() || undefined;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    containerEl.createEl("h3", { text: "Recovery Options" });
+
+    const recoverySetting = new Setting(containerEl)
+      .setName("Recovery Code (Global Skeleton Key)")
+      .setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
+
+    if (this.plugin.settings.recoveryCodeHash) {
+      recoverySetting
+        .setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).")
+        .addButton((btn) =>
+          btn
+            .setButtonText("Remove Recovery Code")
+            .setWarning()
+            .onClick(() => {
+              new ConfirmPasswordModal(
+                this.app,
+                this.plugin,
+                undefined,
+                undefined,
+                "Master Password",
+                async (success) => {
+                  if (success) {
+                    this.plugin.settings.recoveryCodeHash = undefined;
+                    this.plugin.settings.recoveryCodeSalt = undefined;
+                    await this.plugin.saveSettings();
+                    this.display();
+                    new Notice("Recovery Code removed successfully.");
+                  }
+                }
+              ).open();
+            })
+        );
+    } else {
+      recoverySetting.addButton((btn) =>
+        btn
+          .setButtonText("Generate Recovery Code")
+          .setCta()
+          .onClick(() => {
+            new ConfirmPasswordModal(
+              this.app,
+              this.plugin,
+              undefined,
+              undefined,
+              "Master Password",
+              async (success) => {
+                if (success) {
+                  const code = generateRecoveryCode();
+                  const saltBytes = generateSalt();
+                  const hash = await hashPassword(code.toUpperCase(), saltBytes);
+                  this.plugin.settings.recoveryCodeHash = hash;
+                  this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
+                  await this.plugin.saveSettings();
+                  this.display();
+                  new RecoveryCodeDisplayModal(this.app, code).open();
+                }
+              }
+            ).open();
+          })
+      );
+    }
   }
 }
 
@@ -284,7 +449,7 @@ function createInputWithEye(container: HTMLElement, placeholder: string): HTMLIn
   return input;
 }
 
-class PasswordModal extends Modal {
+export class PasswordModal extends Modal {
   plugin: StoneGatePlugin;
   onSubmit: (success: boolean, hash?: string, salt?: string) => void;
   targetHash?: string;
@@ -370,20 +535,22 @@ class PasswordModal extends Modal {
   }
 }
 
-class ConfirmPasswordModal extends Modal {
+export class ConfirmPasswordModal extends Modal {
   plugin: StoneGatePlugin;
   onSubmit: (success: boolean) => void;
   targetHash?: string;
   targetSalt?: string;
   targetName: string;
+  hint?: string;
 
-  constructor(app: App, plugin: StoneGatePlugin, targetHash: string | undefined, targetSalt: string | undefined, targetName: string, onSubmit: (success: boolean) => void) {
+  constructor(app: App, plugin: StoneGatePlugin, targetHash: string | undefined, targetSalt: string | undefined, targetName: string, onSubmit: (success: boolean) => void, hint?: string) {
     super(app);
     this.plugin = plugin;
     this.targetHash = targetHash;
     this.targetSalt = targetSalt;
     this.targetName = targetName;
     this.onSubmit = onSubmit;
+    this.hint = hint;
   }
 
   onOpen() {
@@ -393,6 +560,13 @@ class ConfirmPasswordModal extends Modal {
     contentEl.createEl("p", { text: "Please enter the password to continue." });
 
     const input = createInputWithEye(contentEl, "Password");
+
+    // Display hint if provided
+    if (this.hint) {
+      const hintEl = contentEl.createDiv("sg-hint");
+      hintEl.textContent = this.hint;
+    }
+
     const errorEl = contentEl.createDiv("sg-error");
 
     const submitBtn = contentEl.createEl("button", { text: "Confirm", cls: "mod-cta" });
@@ -431,6 +605,83 @@ class ConfirmPasswordModal extends Modal {
   onClose() {
     this.contentEl.empty();
     this.onSubmit(false);
+  }
+}
+
+export class RecoveryCodeDisplayModal extends Modal {
+  private code: string;
+
+  constructor(app: App, code: string) {
+    super(app);
+    this.code = code;
+  }
+
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    
+    contentEl.createEl("h2", { text: "🔑 Secure Recovery Code Generated", cls: "sg-modal-title" });
+    
+    const desc = contentEl.createEl("p", {
+      text: "This recovery code acts as a Global Skeleton Key. It can bypass and unlock any locked folder or the vault itself if you forget your password.",
+      cls: "sg-modal-desc"
+    });
+    desc.style.marginBottom = "16px";
+
+    const warningBox = contentEl.createDiv("sg-warning-box");
+    warningBox.style.border = "1px solid var(--text-error)";
+    warningBox.style.backgroundColor = "rgba(255, 0, 0, 0.05)";
+    warningBox.style.padding = "12px 16px";
+    warningBox.style.borderRadius = "6px";
+    warningBox.style.marginBottom = "20px";
+    
+    const warningTitle = warningBox.createEl("strong", { text: "⚠️ IMPORTANT WARNING:" });
+    warningTitle.style.color = "var(--text-error)";
+    warningTitle.style.display = "block";
+    warningTitle.style.marginBottom = "6px";
+
+    const warningText = warningBox.createEl("span", {
+      text: "Write this code down or save it in a secure password manager. For security reasons, the code is hashed before saving, and it CANNOT be shown or recovered again once you close this window."
+    });
+    warningText.style.fontSize = "0.9em";
+
+    const codeContainer = contentEl.createDiv("sg-recovery-code-container");
+    codeContainer.style.textAlign = "center";
+    codeContainer.style.margin = "24px 0";
+    codeContainer.style.padding = "16px";
+    codeContainer.style.borderRadius = "8px";
+    codeContainer.style.backgroundColor = "var(--background-secondary-alt)";
+    codeContainer.style.border = "2px dashed var(--interactive-accent)";
+
+    const codeEl = codeContainer.createEl("div", { text: this.code });
+    codeEl.style.fontSize = "2.4em";
+    codeEl.style.fontWeight = "bold";
+    codeEl.style.letterSpacing = "6px";
+    codeEl.style.color = "var(--interactive-accent)";
+    codeEl.style.fontFamily = "monospace";
+    codeEl.style.userSelect = "all";
+
+    const buttonRow = contentEl.createDiv("sg-button-row");
+    buttonRow.style.display = "flex";
+    buttonRow.style.justifyContent = "space-between";
+    buttonRow.style.marginTop = "24px";
+
+    const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
+    copyBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(this.code);
+      new Notice("Recovery code copied to clipboard!");
+      copyBtn.setText("Copied!");
+      setTimeout(() => copyBtn.setText("Copy Code"), 2000);
+    });
+
+    const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
+    closeBtn.addEventListener("click", () => {
+      this.close();
+    });
+  }
+
+  onClose() {
+    this.contentEl.empty();
   }
 }
 
@@ -503,17 +754,35 @@ class AddPathModal extends Modal {
     const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
     hintWrapper.createEl("label", { text: "Password Hint (optional)" }).style.display = "block";
     hintWrapper.style.marginBottom = "8px";
-    const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint..." } });
+    const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint or custom message..." } });
     hintInput.style.width = "100%";
 
     // Show hint toggle
     const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
     toggleWrapper.style.display = "flex";
+    toggleWrapper.style.flexDirection = "row";
     toggleWrapper.style.alignItems = "center";
-    toggleWrapper.style.justifyContent = "space-between";
+    toggleWrapper.style.justifyContent = "flex-start";
+    toggleWrapper.style.gap = "8px";
     toggleWrapper.style.marginBottom = "16px";
-    toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
     const showHintToggle = toggleWrapper.createEl("input", { type: "checkbox" });
+    const showHintLabel = toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
+    showHintLabel.style.cursor = "pointer";
+    showHintLabel.addEventListener("click", () => showHintToggle.click());
+
+    // Ghost mode toggle
+    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    ghostWrapper.style.display = "flex";
+    ghostWrapper.style.flexDirection = "row";
+    ghostWrapper.style.alignItems = "center";
+    ghostWrapper.style.justifyContent = "flex-start";
+    ghostWrapper.style.gap = "8px";
+    ghostWrapper.style.marginBottom = "16px";
+    const ghostToggle = ghostWrapper.createEl("input", { type: "checkbox" });
+    ghostToggle.style.flexShrink = "0";
+    const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
+    ghostLabel.style.cursor = "pointer";
+    ghostLabel.addEventListener("click", () => ghostToggle.click());
 
     // Set path password
     let tempHash: string | undefined = undefined;
@@ -564,7 +833,8 @@ class AddPathModal extends Modal {
         passwordHash: tempHash,
         passwordSalt: tempSalt,
         passwordHint: hintInput.value.trim() || undefined,
-        showHint: showHintToggle.checked
+        showHint: showHintToggle.checked,
+        enableGhostMode: ghostToggle.checked
       });
       
       await this.plugin.saveSettings();
@@ -636,19 +906,38 @@ class EditPathModal extends Modal {
     const hintWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
     hintWrapper.createEl("label", { text: "Password Hint" }).style.display = "block";
     hintWrapper.style.marginBottom = "8px";
-    const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint" } });
+    const hintInput = hintWrapper.createEl("input", { type: "text", attr: { placeholder: "Hint or custom message..." } });
     hintInput.style.width = "100%";
     hintInput.value = this.pathObj.passwordHint || "";
 
     // Show hint toggle
     const toggleWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
     toggleWrapper.style.display = "flex";
+    toggleWrapper.style.flexDirection = "row";
     toggleWrapper.style.alignItems = "center";
-    toggleWrapper.style.justifyContent = "space-between";
+    toggleWrapper.style.justifyContent = "flex-start";
+    toggleWrapper.style.gap = "8px";
     toggleWrapper.style.marginBottom = "16px";
-    toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
     const showHintToggle = toggleWrapper.createEl("input", { type: "checkbox" });
     showHintToggle.checked = this.pathObj.showHint;
+    const showHintLabel = toggleWrapper.createEl("span", { text: "Show hint on lock screen" });
+    showHintLabel.style.cursor = "pointer";
+    showHintLabel.addEventListener("click", () => showHintToggle.click());
+
+    // Ghost mode toggle
+    const ghostWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    ghostWrapper.style.display = "flex";
+    ghostWrapper.style.flexDirection = "row";
+    ghostWrapper.style.alignItems = "center";
+    ghostWrapper.style.justifyContent = "flex-start";
+    ghostWrapper.style.gap = "8px";
+    ghostWrapper.style.marginBottom = "16px";
+    const ghostToggle = ghostWrapper.createEl("input", { type: "checkbox" });
+    ghostToggle.style.flexShrink = "0";
+    ghostToggle.checked = !!this.pathObj.enableGhostMode;
+    const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
+    ghostLabel.style.cursor = "pointer";
+    ghostLabel.addEventListener("click", () => ghostToggle.click());
 
     const pwdControls = contentEl.createDiv();
     pwdControls.style.display = "flex";
@@ -707,8 +996,10 @@ class EditPathModal extends Modal {
       this.pathObj.timeoutMinutes = timeoutVal;
       this.pathObj.passwordHint = hintInput.value.trim() || undefined;
       this.pathObj.showHint = showHintToggle.checked;
+      this.pathObj.enableGhostMode = ghostToggle.checked;
       
       await this.plugin.saveSettings();
+      this.plugin.lockManager.updateGhostModeStyles();
       this.onSubmit(true);
       this.close();
     };

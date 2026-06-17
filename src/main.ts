@@ -3,7 +3,8 @@ import { StoneGateSettings } from "./types";
 import { DEFAULT_SETTINGS } from "./constants";
 import { LockManager } from "./lock-manager";
 import { LockOverlay } from "./overlay";
-import { StoneGateSettingTab } from "./settings";
+import { StoneGateSettingTab, ConfirmPasswordModal } from "./settings";
+import { UnlockPathModal } from "./unlock-path-modal";
 
 export default class StoneGatePlugin extends Plugin {
   settings!: StoneGateSettings;
@@ -15,10 +16,21 @@ export default class StoneGatePlugin extends Plugin {
     await this.loadSettings();
 
     // Initialize overlay first
-    this.overlay = new LockOverlay(this.app, this.settings);
+    this.overlay = new LockOverlay(this.app, this.settings, () => this.saveSettings());
     this.lockManager = new LockManager(this.app, this.settings, this.overlay);
 
-    if (this.settings.enabled && this.settings.lockOnStartup) {
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+    if (isLockedOut) {
+      const defaultPath = this.settings.protectedPaths.find(p => p.id === "default" || p.path === "/");
+      if (defaultPath) {
+        this.lockManager.lockAll();
+        this.overlay.show(defaultPath, null, (success) => {
+          if (success) {
+            this.lockManager.unlock(defaultPath.id);
+          }
+        });
+      }
+    } else if (this.settings.enabled && this.settings.lockOnStartup) {
       const defaultPath = this.settings.protectedPaths.find(p => p.id === "default" || p.path === "/");
       if (defaultPath && (defaultPath.passwordHash || this.settings.passwordHash)) {
         this.overlay.show(defaultPath, null, (success) => {
@@ -75,6 +87,36 @@ export default class StoneGatePlugin extends Plugin {
             this.lockManager.lock(matchingPath.id);
             this.lockManager.triggerLock(file.path);
           }
+        }
+      },
+    });
+
+    this.addCommand({
+      id: "stonegate-unlock-path",
+      name: "Unlock hidden/locked path",
+      callback: () => {
+        if (!this.settings.enabled) return;
+
+        const openUnlockMenu = () => {
+          new UnlockPathModal(this.app, this).open();
+        };
+
+        if (this.settings.unlockMenuPasswordHash && this.settings.unlockMenuPasswordSalt) {
+          new ConfirmPasswordModal(
+            this.app,
+            this,
+            this.settings.unlockMenuPasswordHash,
+            this.settings.unlockMenuPasswordSalt,
+            "Unlock Menu",
+            (success) => {
+              if (success) {
+                openUnlockMenu();
+              }
+            },
+            this.settings.unlockMenuPasswordHint
+          ).open();
+        } else {
+          openUnlockMenu();
         }
       },
     });
