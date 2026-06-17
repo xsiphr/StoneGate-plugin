@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/StoneGate-logo.png" width="300" alt="StoneGate Logo">
+  <img src="assets/StoneGate-logo.png" width="600" alt="StoneGate Logo">
 </p>
 
 StoneGate is a lock screen plugin for Obsidian, designed to protect your vault and individual folders with password authentication.
