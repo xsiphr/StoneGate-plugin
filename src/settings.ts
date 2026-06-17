@@ -298,7 +298,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Custom Background URL/Path")
-      .setDesc("URL or local path to a custom background image. You can copy an Obsidian URL using the 'Copy Obsidian URL' feature (starts with app://obsidian.md/...).")
+      .setDesc("URL or local path to a custom background image. You can use an external URL (http/https), or a local file from the vault (simply type the file name or use the path in the vault).")
       .addText((text) => {
         text
           .setPlaceholder("https://example.com/image.jpg")
