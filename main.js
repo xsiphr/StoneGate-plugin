@@ -942,7 +942,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
   display() {
     const { containerEl } = this;
     containerEl.empty();
-    containerEl.createEl("h2", { text: "StoneGate Settings" });
+    new import_obsidian3.Setting(containerEl).setName("StoneGate Settings").setHeading();
     new import_obsidian3.Setting(containerEl).setName("Enable StoneGate").setDesc("Turn on lock screen protection").addToggle((toggle) => {
       let isSyncing = false;
       toggle.setValue(this.plugin.settings.enabled).onChange(async (value) => {
@@ -1004,7 +1004,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         }
       });
     });
-    containerEl.createEl("h3", { text: "Master Password" });
+    new import_obsidian3.Setting(containerEl).setName("Master Password").setHeading();
     const passwordSetting = new import_obsidian3.Setting(containerEl).setName("Password").setDesc("Used to unlock your vault and folders");
     if (this.plugin.settings.passwordHash) {
       passwordSetting.addButton(
@@ -1045,7 +1045,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         })
       );
     }
-    containerEl.createEl("h3", { text: "Protected Paths" });
+    new import_obsidian3.Setting(containerEl).setName("Protected Paths").setHeading();
     new import_obsidian3.Setting(containerEl).setName("Add Protected Path").setDesc("Select a folder to protect.").addButton(
       (btn) => btn.setButtonText("Add Path").setCta().onClick(() => {
         new AddPathModal(this.app, this.plugin, () => this.display()).open();
@@ -1065,7 +1065,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         })
       );
     }
-    containerEl.createEl("h3", { text: "Behavior" });
+    new import_obsidian3.Setting(containerEl).setName("Behavior").setHeading();
     new import_obsidian3.Setting(containerEl).setName("Lock on Startup").setDesc("Require password immediately when opening Obsidian").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.lockOnStartup).onChange(async (value) => {
         this.plugin.settings.lockOnStartup = value;
@@ -1111,7 +1111,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Appearance" });
+    new import_obsidian3.Setting(containerEl).setName("Appearance").setHeading();
     new import_obsidian3.Setting(containerEl).setName("Show StoneGate Title").setDesc("Show the 'StoneGate' app name at the top of the lock screen").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showStoneGateTitle).onChange(async (value) => {
         this.plugin.settings.showStoneGateTitle = value;
@@ -1131,7 +1131,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
       });
       new ImagePathSuggest(this.app, text.inputEl);
     });
-    containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
+    new import_obsidian3.Setting(containerEl).setName("Ghost Mode & Commands").setHeading();
     const unlockMenuPwdSetting = new import_obsidian3.Setting(containerEl).setName("Unlock Menu Access Password").setDesc("Used to access the command palette list of hidden/locked paths");
     if (this.plugin.settings.unlockMenuPasswordHash) {
       unlockMenuPwdSetting.addButton(
@@ -1177,7 +1177,7 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    containerEl.createEl("h3", { text: "Recovery Options" });
+    new import_obsidian3.Setting(containerEl).setName("Recovery Options").setHeading();
     const recoverySetting = new import_obsidian3.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
     if (this.plugin.settings.recoveryCodeHash) {
       recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton(

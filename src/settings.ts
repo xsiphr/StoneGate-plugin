@@ -15,7 +15,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "StoneGate Settings" });
+    new Setting(containerEl).setName("StoneGate Settings").setHeading();
 
     // --- Protection Enable/Disable ---
     new Setting(containerEl)
@@ -86,7 +86,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
           });
       });
 
-    containerEl.createEl("h3", { text: "Master Password" });
+    new Setting(containerEl).setName("Master Password").setHeading();
 
     const passwordSetting = new Setting(containerEl)
       .setName("Password")
@@ -145,7 +145,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
       );
     }
 
-    containerEl.createEl("h3", { text: "Protected Paths" });
+    new Setting(containerEl).setName("Protected Paths").setHeading();
 
     new Setting(containerEl)
       .setName("Add Protected Path")
@@ -182,7 +182,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
         );
     }
 
-    containerEl.createEl("h3", { text: "Behavior" });
+    new Setting(containerEl).setName("Behavior").setHeading();
 
     new Setting(containerEl)
       .setName("Lock on Startup")
@@ -269,7 +269,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
 
 
 
-    containerEl.createEl("h3", { text: "Appearance" });
+    new Setting(containerEl).setName("Appearance").setHeading();
 
     new Setting(containerEl)
       .setName("Show StoneGate Title")
@@ -312,7 +312,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
 
 
 
-    containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
+    new Setting(containerEl).setName("Ghost Mode & Commands").setHeading();
 
     const unlockMenuPwdSetting = new Setting(containerEl)
       .setName("Unlock Menu Access Password")
@@ -380,7 +380,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
           })
       );
 
-    containerEl.createEl("h3", { text: "Recovery Options" });
+    new Setting(containerEl).setName("Recovery Options").setHeading();
 
     const recoverySetting = new Setting(containerEl)
       .setName("Recovery Code (Global Skeleton Key)")
