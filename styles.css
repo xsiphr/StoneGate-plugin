@@ -30,6 +30,11 @@
     display: none !important;
 }
 
+.nav-folder[data-sg-ghost="true"],
+.nav-file[data-sg-ghost="true"] {
+    display: none !important;
+}
+
 .sg-overlay-fade-out {
     animation: sg-fadeout 0.3s ease-out forwards;
 }

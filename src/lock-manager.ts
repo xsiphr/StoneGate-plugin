@@ -1,4 +1,4 @@
-import { App, TAbstractFile } from "obsidian";
+import { App, TAbstractFile, debounce } from "obsidian";
 import { StoneGateSettings, ProtectedPath } from "./types";
 import { LockOverlay } from "./overlay";
 
@@ -26,10 +26,15 @@ export class LockManager {
   // Used for throttling activity updates (max once per second)
   private activityUpdatePending = false;
 
+  private ghostModeObserver: MutationObserver | null = null;
+  private debouncedUpdateGhostMode: () => void;
+
   constructor(app: App, settings: StoneGateSettings, overlay: LockOverlay) {
     this.app = app;
     this.settings = settings;
     this.overlay = overlay;
+
+    this.debouncedUpdateGhostMode = debounce(this.updateGhostModeDOM.bind(this), 100, true);
 
     this.setupListeners();
     this.startIdleChecker();
@@ -254,31 +259,60 @@ export class LockManager {
   }
 
   public updateGhostModeStyles() {
-    let styleEl = document.getElementById("stonegate-ghost-mode") as HTMLStyleElement;
     if (!this.settings.enabled) {
-      if (styleEl) styleEl.remove();
+      if (this.ghostModeObserver) {
+        this.ghostModeObserver.disconnect();
+        this.ghostModeObserver = null;
+      }
+      this.clearGhostModeAttributes();
       return;
     }
 
-    let css = "";
+    if (!this.ghostModeObserver) {
+      this.ghostModeObserver = new MutationObserver(() => {
+        this.debouncedUpdateGhostMode();
+      });
+      this.ghostModeObserver.observe(document.body, { childList: true, subtree: true });
+    }
+
+    this.updateGhostModeDOM();
+  }
+
+  private clearGhostModeAttributes() {
+    const els = document.querySelectorAll("[data-sg-ghost]");
+    els.forEach(el => el.removeAttribute("data-sg-ghost"));
+  }
+
+  private updateGhostModeDOM() {
+    if (!this.settings.enabled) {
+      this.clearGhostModeAttributes();
+      return;
+    }
+
+    const lockedPaths = new Set<string>();
     for (const path of this.settings.protectedPaths) {
       if (path.path === "/" || path.path === "") continue; // Skip root path
       if (path.enableGhostMode && this.isLocked(path.path)) {
-        const safePath = path.path.replace(/"/g, '\\"');
-        css += `.nav-folder:has(> .nav-folder-title[data-path="${safePath}"]), .nav-file:has(> .nav-file-title[data-path="${safePath}"]) { display: none !important; }\n`;
+        lockedPaths.add(path.path);
       }
     }
 
-    if (css) {
-      if (!styleEl) {
-        styleEl = document.createElement("style");
-        styleEl.id = "stonegate-ghost-mode";
-        document.head.appendChild(styleEl);
+    const titleElements = document.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
+    titleElements.forEach(titleEl => {
+      const path = titleEl.getAttribute("data-path");
+      const parentEl = titleEl.parentElement;
+      if (parentEl && path) {
+        if (lockedPaths.has(path)) {
+          if (parentEl.getAttribute("data-sg-ghost") !== "true") {
+            parentEl.setAttribute("data-sg-ghost", "true");
+          }
+        } else {
+          if (parentEl.hasAttribute("data-sg-ghost")) {
+            parentEl.removeAttribute("data-sg-ghost");
+          }
+        }
       }
-      styleEl.textContent = css;
-    } else {
-      if (styleEl) styleEl.remove();
-    }
+    });
   }
 
   public dispose() {
@@ -296,7 +330,10 @@ export class LockManager {
       window.clearTimeout(this.blurTimerId);
     }
 
-    const styleEl = document.getElementById("stonegate-ghost-mode");
-    if (styleEl) styleEl.remove();
+    if (this.ghostModeObserver) {
+      this.ghostModeObserver.disconnect();
+      this.ghostModeObserver = null;
+    }
+    this.clearGhostModeAttributes();
   }
 }

@@ -28,7 +28,7 @@ __export(main_exports, {
   default: () => StoneGatePlugin
 });
 module.exports = __toCommonJS(main_exports);
-var import_obsidian4 = require("obsidian");
+var import_obsidian5 = require("obsidian");
 
 // src/constants.ts
 var DEFAULT_SETTINGS = {
@@ -68,6 +68,7 @@ var DEFAULT_SETTINGS = {
 };
 
 // src/lock-manager.ts
+var import_obsidian = require("obsidian");
 var LockManager = class {
   constructor(app, settings, overlay) {
     // pathId -> timestamp when last unlocked
@@ -82,9 +83,11 @@ var LockManager = class {
     this.boundFocusHandler = this.handleWindowFocus.bind(this);
     // Used for throttling activity updates (max once per second)
     this.activityUpdatePending = false;
+    this.ghostModeObserver = null;
     this.app = app;
     this.settings = settings;
     this.overlay = overlay;
+    this.debouncedUpdateGhostMode = (0, import_obsidian.debounce)(this.updateGhostModeDOM.bind(this), 100, true);
     this.setupListeners();
     this.startIdleChecker();
     this.updateGhostModeStyles();
@@ -275,33 +278,55 @@ var LockManager = class {
     }
   }
   updateGhostModeStyles() {
-    let styleEl = document.getElementById("stonegate-ghost-mode");
     if (!this.settings.enabled) {
-      if (styleEl)
-        styleEl.remove();
+      if (this.ghostModeObserver) {
+        this.ghostModeObserver.disconnect();
+        this.ghostModeObserver = null;
+      }
+      this.clearGhostModeAttributes();
       return;
     }
-    let css = "";
+    if (!this.ghostModeObserver) {
+      this.ghostModeObserver = new MutationObserver(() => {
+        this.debouncedUpdateGhostMode();
+      });
+      this.ghostModeObserver.observe(document.body, { childList: true, subtree: true });
+    }
+    this.updateGhostModeDOM();
+  }
+  clearGhostModeAttributes() {
+    const els = document.querySelectorAll("[data-sg-ghost]");
+    els.forEach((el) => el.removeAttribute("data-sg-ghost"));
+  }
+  updateGhostModeDOM() {
+    if (!this.settings.enabled) {
+      this.clearGhostModeAttributes();
+      return;
+    }
+    const lockedPaths = /* @__PURE__ */ new Set();
     for (const path of this.settings.protectedPaths) {
       if (path.path === "/" || path.path === "")
         continue;
       if (path.enableGhostMode && this.isLocked(path.path)) {
-        const safePath = path.path.replace(/"/g, '\\"');
-        css += `.nav-folder:has(> .nav-folder-title[data-path="${safePath}"]), .nav-file:has(> .nav-file-title[data-path="${safePath}"]) { display: none !important; }
-`;
+        lockedPaths.add(path.path);
       }
     }
-    if (css) {
-      if (!styleEl) {
-        styleEl = document.createElement("style");
-        styleEl.id = "stonegate-ghost-mode";
-        document.head.appendChild(styleEl);
+    const titleElements = document.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
+    titleElements.forEach((titleEl) => {
+      const path = titleEl.getAttribute("data-path");
+      const parentEl = titleEl.parentElement;
+      if (parentEl && path) {
+        if (lockedPaths.has(path)) {
+          if (parentEl.getAttribute("data-sg-ghost") !== "true") {
+            parentEl.setAttribute("data-sg-ghost", "true");
+          }
+        } else {
+          if (parentEl.hasAttribute("data-sg-ghost")) {
+            parentEl.removeAttribute("data-sg-ghost");
+          }
+        }
       }
-      styleEl.textContent = css;
-    } else {
-      if (styleEl)
-        styleEl.remove();
-    }
+    });
   }
   dispose() {
     document.removeEventListener("mousemove", this.boundActivityHandler);
@@ -316,14 +341,16 @@ var LockManager = class {
     if (this.blurTimerId !== null) {
       window.clearTimeout(this.blurTimerId);
     }
-    const styleEl = document.getElementById("stonegate-ghost-mode");
-    if (styleEl)
-      styleEl.remove();
+    if (this.ghostModeObserver) {
+      this.ghostModeObserver.disconnect();
+      this.ghostModeObserver = null;
+    }
+    this.clearGhostModeAttributes();
   }
 };
 
 // src/overlay.ts
-var import_obsidian = require("obsidian");
+var import_obsidian2 = require("obsidian");
 
 // src/crypto.ts
 function generateSalt() {
@@ -440,7 +467,7 @@ var LockOverlay = class {
         const filePath = parsed.searchParams.get("file") || parsed.searchParams.get("path");
         if (filePath) {
           const file2 = this.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(filePath), "") || this.app.vault.getAbstractFileByPath(decodeURIComponent(filePath));
-          if (file2 && file2 instanceof import_obsidian.TFile) {
+          if (file2 && file2 instanceof import_obsidian2.TFile) {
             return this.app.vault.getResourcePath(file2);
           }
         }
@@ -448,7 +475,7 @@ var LockOverlay = class {
       }
     }
     const file = this.app.metadataCache.getFirstLinkpathDest(url, "") || this.app.vault.getAbstractFileByPath(url);
-    if (file && file instanceof import_obsidian.TFile) {
+    if (file && file instanceof import_obsidian2.TFile) {
       return this.app.vault.getResourcePath(file);
     }
     const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/i.test(url) || url.startsWith("\\\\");
@@ -654,7 +681,7 @@ var LockOverlay = class {
   }
   async handleSuccessfulUnlock() {
     if (this.settings.intruderAlert && this.settings.totalIntruderAttempts > 0) {
-      new import_obsidian.Notice(
+      new import_obsidian2.Notice(
         `\u{1F6A8} Security Alert: ${this.settings.totalIntruderAttempts} failed unlock attempt(s) detected.`,
         1e4
       );
@@ -688,7 +715,7 @@ var LockOverlay = class {
       const upperGuess = guess.trim().toUpperCase();
       isMatch = await verifyPassword(upperGuess, this.settings.recoveryCodeHash, this.settings.recoveryCodeSalt);
       if (isMatch) {
-        new import_obsidian.Notice("\u{1F513} Unlocked using Recovery Code (Global Skeleton Key).", 5e3);
+        new import_obsidian2.Notice("\u{1F513} Unlocked using Recovery Code (Global Skeleton Key).", 5e3);
       }
     }
     if (isMatch) {
@@ -716,13 +743,13 @@ var LockOverlay = class {
     if (this.isRecoveryPromptOpen)
       return;
     if (!this.settings.recoveryCodeHash || !this.settings.recoveryCodeSalt) {
-      new import_obsidian.Notice("No Recovery Code is configured. Set one up in StoneGate settings.", 6e3);
+      new import_obsidian2.Notice("No Recovery Code is configured. Set one up in StoneGate settings.", 6e3);
       return;
     }
     this.isRecoveryPromptOpen = true;
     new RecoveryBypassModal(this.app, this.settings, async (verified) => {
       if (verified) {
-        new import_obsidian.Notice("\u{1F513} Lockout bypassed using Recovery Code.", 5e3);
+        new import_obsidian2.Notice("\u{1F513} Lockout bypassed using Recovery Code.", 5e3);
         await this.handleSuccessfulUnlock();
       }
     }, () => {
@@ -787,7 +814,7 @@ var LockOverlay = class {
     }
   }
 };
-var RecoveryBypassModal = class extends import_obsidian.Modal {
+var RecoveryBypassModal = class extends import_obsidian2.Modal {
   constructor(app, settings, onResult, onCloseCallback) {
     super(app);
     this.settings = settings;
@@ -872,7 +899,7 @@ var RecoveryBypassModal = class extends import_obsidian.Modal {
         unlockBtn.textContent = "Use Recovery Code";
         errorEl.textContent = "Invalid Recovery Code. Please check and try again.";
         input.value = "";
-        new import_obsidian.Notice("\u274C Invalid Recovery Code.", 4e3);
+        new import_obsidian2.Notice("\u274C Invalid Recovery Code.", 4e3);
       }
     };
     unlockBtn.addEventListener("click", attempt);
@@ -897,8 +924,8 @@ var RecoveryBypassModal = class extends import_obsidian.Modal {
 };
 
 // src/settings.ts
-var import_obsidian2 = require("obsidian");
-var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
+var import_obsidian3 = require("obsidian");
+var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
   constructor(app, plugin) {
     super(app, plugin);
     this.plugin = plugin;
@@ -907,7 +934,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
     containerEl.createEl("h2", { text: "StoneGate Settings" });
-    new import_obsidian2.Setting(containerEl).setName("Enable StoneGate").setDesc("Turn on lock screen protection").addToggle((toggle) => {
+    new import_obsidian3.Setting(containerEl).setName("Enable StoneGate").setDesc("Turn on lock screen protection").addToggle((toggle) => {
       let isSyncing = false;
       toggle.setValue(this.plugin.settings.enabled).onChange(async (value) => {
         if (isSyncing)
@@ -969,7 +996,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
       });
     });
     containerEl.createEl("h3", { text: "Master Password" });
-    const passwordSetting = new import_obsidian2.Setting(containerEl).setName("Password").setDesc("Used to unlock your vault and folders");
+    const passwordSetting = new import_obsidian3.Setting(containerEl).setName("Password").setDesc("Used to unlock your vault and folders");
     if (this.plugin.settings.passwordHash) {
       passwordSetting.addButton(
         (btn) => btn.setButtonText("Change Password").onClick(() => {
@@ -1010,14 +1037,14 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
       );
     }
     containerEl.createEl("h3", { text: "Protected Paths" });
-    new import_obsidian2.Setting(containerEl).setName("Add Protected Path").setDesc("Select a folder to protect.").addButton(
+    new import_obsidian3.Setting(containerEl).setName("Add Protected Path").setDesc("Select a folder to protect.").addButton(
       (btn) => btn.setButtonText("Add Path").setCta().onClick(() => {
         new AddPathModal(this.app, this.plugin, () => this.display()).open();
       })
     );
     const pathsContainer = containerEl.createDiv();
     for (const path of this.plugin.settings.protectedPaths) {
-      new import_obsidian2.Setting(pathsContainer).setName(path.path === "/" || path.path === "" ? "Vault" : path.path).setDesc(`${path.label ? path.label + " | " : ""}${path.timeoutMinutes} min timeout${path.passwordHash ? " | \u{1F511} Has own password" : ""}`).addButton(
+      new import_obsidian3.Setting(pathsContainer).setName(path.path === "/" || path.path === "" ? "Vault" : path.path).setDesc(`${path.label ? path.label + " | " : ""}${path.timeoutMinutes} min timeout${path.passwordHash ? " | \u{1F511} Has own password" : ""}`).addButton(
         (btn) => btn.setButtonText("Edit").onClick(() => {
           new EditPathModal(this.app, this.plugin, path, () => this.display()).open();
         })
@@ -1030,19 +1057,19 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
       );
     }
     containerEl.createEl("h3", { text: "Behavior" });
-    new import_obsidian2.Setting(containerEl).setName("Lock on Startup").setDesc("Require password immediately when opening Obsidian").addToggle(
+    new import_obsidian3.Setting(containerEl).setName("Lock on Startup").setDesc("Require password immediately when opening Obsidian").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.lockOnStartup).onChange(async (value) => {
         this.plugin.settings.lockOnStartup = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Lock when Obsidian loses focus").setDesc("Lock immediately when the window loses focus").addToggle(
+    new import_obsidian3.Setting(containerEl).setName("Lock when Obsidian loses focus").setDesc("Lock immediately when the window loses focus").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.lockOnBlur).onChange(async (value) => {
         this.plugin.settings.lockOnBlur = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Blur Grace Period (seconds)").setDesc("Time in seconds to wait before locking after focus loss (0 = immediate)").addText(
+    new import_obsidian3.Setting(containerEl).setName("Blur Grace Period (seconds)").setDesc("Time in seconds to wait before locking after focus loss (0 = immediate)").addText(
       (text) => text.setPlaceholder("3").setValue(String(this.plugin.settings.blurGracePeriodSeconds)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num >= 0) {
@@ -1051,7 +1078,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Max Failed Attempts").setDesc("0 = unlimited").addText(
+    new import_obsidian3.Setting(containerEl).setName("Max Failed Attempts").setDesc("0 = unlimited").addText(
       (text) => text.setPlaceholder("3").setValue(String(this.plugin.settings.maxFailedAttempts)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num >= 0) {
@@ -1060,7 +1087,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Lockout Duration (seconds)").addText(
+    new import_obsidian3.Setting(containerEl).setName("Lockout Duration (seconds)").addText(
       (text) => text.setPlaceholder("60").setValue(String(this.plugin.settings.lockoutDurationSeconds)).onChange(async (value) => {
         const num = parseInt(value, 10);
         if (!isNaN(num) && num >= 0) {
@@ -1069,26 +1096,26 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         }
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Intruder Alert").setDesc("Show a notice upon unlocking if there were failed attempts").addToggle(
+    new import_obsidian3.Setting(containerEl).setName("Intruder Alert").setDesc("Show a notice upon unlocking if there were failed attempts").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.intruderAlert).onChange(async (value) => {
         this.plugin.settings.intruderAlert = value;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Appearance" });
-    new import_obsidian2.Setting(containerEl).setName("Show StoneGate Title").setDesc("Show the 'StoneGate' app name at the top of the lock screen").addToggle(
+    new import_obsidian3.Setting(containerEl).setName("Show StoneGate Title").setDesc("Show the 'StoneGate' app name at the top of the lock screen").addToggle(
       (toggle) => toggle.setValue(this.plugin.settings.showStoneGateTitle).onChange(async (value) => {
         this.plugin.settings.showStoneGateTitle = value;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Custom Lock Screen Title").setDesc("Custom text to show at the top of the lock screen (defaults to 'StoneGate')").addText(
+    new import_obsidian3.Setting(containerEl).setName("Custom Lock Screen Title").setDesc("Custom text to show at the top of the lock screen (defaults to 'StoneGate')").addText(
       (text) => text.setPlaceholder("StoneGate").setValue(this.plugin.settings.customTitle || "").onChange(async (value) => {
         this.plugin.settings.customTitle = value.trim() || void 0;
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Custom Background URL/Path").setDesc("URL or local path to a custom background image. You can use an external URL (http/https), or a local file from the vault (simply type the file name or use the path in the vault).").addText((text) => {
+    new import_obsidian3.Setting(containerEl).setName("Custom Background URL/Path").setDesc("URL or local path to a custom background image. You can use an external URL (http/https), or a local file from the vault (simply type the file name or use the path in the vault).").addText((text) => {
       text.setPlaceholder("https://example.com/image.jpg").setValue(this.plugin.settings.customBackgroundUrl || "").onChange(async (value) => {
         this.plugin.settings.customBackgroundUrl = value.trim();
         await this.plugin.saveSettings();
@@ -1096,7 +1123,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
       new ImagePathSuggest(this.app, text.inputEl);
     });
     containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
-    const unlockMenuPwdSetting = new import_obsidian2.Setting(containerEl).setName("Unlock Menu Access Password").setDesc("Used to access the command palette list of hidden/locked paths");
+    const unlockMenuPwdSetting = new import_obsidian3.Setting(containerEl).setName("Unlock Menu Access Password").setDesc("Used to access the command palette list of hidden/locked paths");
     if (this.plugin.settings.unlockMenuPasswordHash) {
       unlockMenuPwdSetting.addButton(
         (btn) => btn.setButtonText("Change Password").onClick(() => {
@@ -1135,14 +1162,14 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         })
       );
     }
-    new import_obsidian2.Setting(containerEl).setName("Unlock Menu Password Hint").setDesc("Hint shown when the Unlock Menu password is requested").addText(
+    new import_obsidian3.Setting(containerEl).setName("Unlock Menu Password Hint").setDesc("Hint shown when the Unlock Menu password is requested").addText(
       (text) => text.setPlaceholder("Hint or custom message...").setValue(this.plugin.settings.unlockMenuPasswordHint || "").onChange(async (value) => {
         this.plugin.settings.unlockMenuPasswordHint = value.trim() || void 0;
         await this.plugin.saveSettings();
       })
     );
     containerEl.createEl("h3", { text: "Recovery Options" });
-    const recoverySetting = new import_obsidian2.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
+    const recoverySetting = new import_obsidian3.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
     if (this.plugin.settings.recoveryCodeHash) {
       recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton(
         (btn) => btn.setButtonText("Remove Recovery Code").setWarning().onClick(() => {
@@ -1158,7 +1185,7 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
                 this.plugin.settings.recoveryCodeSalt = void 0;
                 await this.plugin.saveSettings();
                 this.display();
-                new import_obsidian2.Notice("Recovery Code removed successfully.");
+                new import_obsidian3.Notice("Recovery Code removed successfully.");
               }
             }
           ).open();
@@ -1207,7 +1234,7 @@ function createInputWithEye(container, placeholder) {
   });
   return input;
 }
-var PasswordModal = class extends import_obsidian2.Modal {
+var PasswordModal = class extends import_obsidian3.Modal {
   constructor(app, plugin, targetHash, targetSalt, targetName, onSubmit) {
     super(app);
     this.plugin = plugin;
@@ -1277,7 +1304,7 @@ var PasswordModal = class extends import_obsidian2.Modal {
     this.onSubmit(false);
   }
 };
-var ConfirmPasswordModal = class extends import_obsidian2.Modal {
+var ConfirmPasswordModal = class extends import_obsidian3.Modal {
   constructor(app, plugin, targetHash, targetSalt, targetName, onSubmit, hint) {
     super(app);
     this.plugin = plugin;
@@ -1332,7 +1359,7 @@ var ConfirmPasswordModal = class extends import_obsidian2.Modal {
     this.onSubmit(false);
   }
 };
-var RecoveryCodeDisplayModal = class extends import_obsidian2.Modal {
+var RecoveryCodeDisplayModal = class extends import_obsidian3.Modal {
   constructor(app, code) {
     super(app);
     this.code = code;
@@ -1381,7 +1408,7 @@ var RecoveryCodeDisplayModal = class extends import_obsidian2.Modal {
     const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
     copyBtn.addEventListener("click", async () => {
       await navigator.clipboard.writeText(this.code);
-      new import_obsidian2.Notice("Recovery code copied to clipboard!");
+      new import_obsidian3.Notice("Recovery code copied to clipboard!");
       copyBtn.setText("Copied!");
       setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
     });
@@ -1394,7 +1421,7 @@ var RecoveryCodeDisplayModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
-var AddPathModal = class extends import_obsidian2.Modal {
+var AddPathModal = class extends import_obsidian3.Modal {
   constructor(app, plugin, onSubmit) {
     super(app);
     this.plugin = plugin;
@@ -1571,7 +1598,7 @@ var AddPathModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
-var EditPathModal = class extends import_obsidian2.Modal {
+var EditPathModal = class extends import_obsidian3.Modal {
   constructor(app, plugin, pathObj, onSubmit) {
     super(app);
     this.plugin = plugin;
@@ -1735,7 +1762,7 @@ var EditPathModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
-var ImagePathSuggest = class extends import_obsidian2.AbstractInputSuggest {
+var ImagePathSuggest = class extends import_obsidian3.AbstractInputSuggest {
   constructor(app, inputEl) {
     super(app, inputEl);
     this.inputEl = inputEl;
@@ -1762,8 +1789,8 @@ var ImagePathSuggest = class extends import_obsidian2.AbstractInputSuggest {
 };
 
 // src/unlock-path-modal.ts
-var import_obsidian3 = require("obsidian");
-var UnlockPathModal = class extends import_obsidian3.FuzzySuggestModal {
+var import_obsidian4 = require("obsidian");
+var UnlockPathModal = class extends import_obsidian4.FuzzySuggestModal {
   constructor(app, plugin) {
     super(app);
     this.plugin = plugin;
@@ -1783,7 +1810,7 @@ var UnlockPathModal = class extends import_obsidian3.FuzzySuggestModal {
 };
 
 // src/main.ts
-var StoneGatePlugin = class extends import_obsidian4.Plugin {
+var StoneGatePlugin = class extends import_obsidian5.Plugin {
   constructor() {
     super(...arguments);
     this.currentFilePath = null;
