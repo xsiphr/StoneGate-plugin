@@ -16,6 +16,10 @@
 
 StoneGate protects your Obsidian vault and individual folders with password authentication, idle timeouts, brute-force lockouts, and an optional stealth mode that hides protected folders entirely.
 
+<p align="center">
+  <img src="assets/lockscreen-preview.png" width="700" alt="StoneGate lock screen">
+</p>
+
 ## 🚀 Features
 
 | Feature | Description |
