@@ -54,10 +54,17 @@ var DEFAULT_SETTINGS = {
   intruderAlert: false,
   maxFailedAttempts: 3,
   lockoutDurationSeconds: 60,
+  failedAttempts: 0,
+  totalIntruderAttempts: 0,
+  lockoutUntil: 0,
+  recoveryCodeHash: void 0,
+  recoveryCodeSalt: void 0,
   showStoneGateTitle: true,
   customTitle: void 0,
   unlockMenuPasswordHash: void 0,
-  unlockMenuPasswordSalt: void 0
+  unlockMenuPasswordSalt: void 0,
+  unlockMenuPasswordHint: void 0,
+  customBackgroundUrl: ""
 };
 
 // src/lock-manager.ts
@@ -221,6 +228,7 @@ var LockManager = class {
   handleFileOpen(file) {
     if (!file)
       return;
+    this.lastActivityTime = Date.now();
     if (this.isLocked(file.path)) {
       this.triggerLock(file.path);
     }
@@ -378,37 +386,107 @@ async function verifyPassword(guess, storedHashBase64, storedSaltBase64) {
 function uint8ArrayToBase64(bytes) {
   return arrayBufferToBase64(bytes.buffer);
 }
+function generateRecoveryCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  const randomValues = new Uint8Array(6);
+  window.crypto.getRandomValues(randomValues);
+  let code = "";
+  for (let i = 0; i < 6; i++) {
+    code += chars[randomValues[i] % chars.length];
+  }
+  return code;
+}
 
 // src/overlay.ts
 var LockOverlay = class {
-  constructor(app, settings) {
+  constructor(app, settings, saveSettings) {
     this.containerEl = null;
+    this.bgLayerEl = null;
     this.inputEl = null;
     this.submitBtnEl = null;
     this.errorEl = null;
     this.counterEl = null;
     this.lockoutEl = null;
+    this.recoveryBypassEl = null;
     this.appNameEl = null;
     this.titleEl = null;
     this.hintEl = null;
     this.currentCallback = null;
     this.currentPath = null;
     this.previousFile = null;
-    this.failedAttempts = 0;
-    this.lockoutUntil = 0;
     this.lockoutTimer = null;
     this.boundHandleKeydown = this.handleKeydown.bind(this);
     this.observer = null;
+    this.isRecoveryPromptOpen = false;
     this.app = app;
     this.settings = settings;
+    this.saveSettings = saveSettings;
     this.createOverlay();
   }
   updateSettings(settings) {
     this.settings = settings;
+    this.applyBackgroundStyles();
+  }
+  resolveBackgroundUrl(url) {
+    if (!url)
+      return "";
+    url = url.trim();
+    if (/^(https?:\/\/|data:|app:\/\/)/i.test(url)) {
+      return url;
+    }
+    if (url.startsWith("obsidian://")) {
+      try {
+        const parsed = new URL(url);
+        const filePath = parsed.searchParams.get("file") || parsed.searchParams.get("path");
+        if (filePath) {
+          const file2 = this.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(filePath), "") || this.app.vault.getAbstractFileByPath(decodeURIComponent(filePath));
+          if (file2 && file2 instanceof import_obsidian.TFile) {
+            return this.app.vault.getResourcePath(file2);
+          }
+        }
+      } catch (e) {
+      }
+    }
+    const file = this.app.metadataCache.getFirstLinkpathDest(url, "") || this.app.vault.getAbstractFileByPath(url);
+    if (file && file instanceof import_obsidian.TFile) {
+      return this.app.vault.getResourcePath(file);
+    }
+    const isWindowsAbsolute = /^[a-zA-Z]:[\\/]/i.test(url) || url.startsWith("\\\\");
+    const isPosixAbsolute = url.startsWith("/");
+    if (isWindowsAbsolute || isPosixAbsolute) {
+      let normalizedPath = url.replace(/\\/g, "/");
+      if (normalizedPath.startsWith("/")) {
+        return `app://local${normalizedPath}`;
+      } else {
+        return `app://local/${normalizedPath}`;
+      }
+    }
+    return url;
+  }
+  applyBackgroundStyles() {
+    if (!this.containerEl || !this.bgLayerEl)
+      return;
+    const resolvedUrl = this.resolveBackgroundUrl(this.settings.customBackgroundUrl);
+    if (resolvedUrl) {
+      this.bgLayerEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`;
+      this.bgLayerEl.style.backgroundSize = "cover";
+      this.bgLayerEl.style.backgroundPosition = "center";
+      this.bgLayerEl.style.filter = "blur(10px)";
+      this.bgLayerEl.style.transform = "scale(1.1)";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "scale(1.1)");
+    } else {
+      this.bgLayerEl.style.backgroundImage = "";
+      this.bgLayerEl.style.backgroundSize = "";
+      this.bgLayerEl.style.backgroundPosition = "";
+      this.bgLayerEl.style.filter = "";
+      this.bgLayerEl.style.transform = "";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+    }
   }
   createOverlay() {
     this.containerEl = document.createElement("div");
     this.containerEl.addClass("sg-overlay-container", "sg-overlay-hidden");
+    this.bgLayerEl = this.containerEl.createDiv("sg-background-layer");
     const card = this.containerEl.createDiv("sg-overlay-card");
     this.appNameEl = card.createEl("div", { text: "StoneGate", cls: "sg-app-name" });
     this.titleEl = card.createEl("h2", { cls: "sg-title" });
@@ -439,7 +517,20 @@ var LockOverlay = class {
     this.errorEl = card.createDiv("sg-error");
     this.counterEl = card.createDiv("sg-counter");
     this.lockoutEl = card.createDiv("sg-lockout");
+    this.recoveryBypassEl = card.createDiv("sg-recovery-bypass");
+    this.recoveryBypassEl.style.display = "none";
+    const recoveryLink = this.recoveryBypassEl.createEl("a", {
+      text: "Use Recovery Code",
+      cls: "sg-recovery-link"
+    });
+    recoveryLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      this.openRecoveryBypassModal();
+    });
     this.submitBtnEl.addEventListener("click", () => this.submit());
+    this.containerEl.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+    });
     document.body.appendChild(this.containerEl);
     this.observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -456,6 +547,12 @@ var LockOverlay = class {
   handleKeydown(e) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden"))
       return;
+    const recoveryModal = document.querySelector(".sg-recovery-modal-container");
+    const recoveryInput = recoveryModal == null ? void 0 : recoveryModal.querySelector("input");
+    if (recoveryInput && document.activeElement === recoveryInput) {
+      e.stopPropagation();
+      return;
+    }
     e.stopPropagation();
     if (e.key === "Escape") {
       e.preventDefault();
@@ -466,13 +563,15 @@ var LockOverlay = class {
       this.submit();
       return;
     }
-    if (this.inputEl && document.activeElement !== this.inputEl) {
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+    if (!isLockedOut && this.inputEl && document.activeElement !== this.inputEl) {
       this.inputEl.focus();
     }
   }
   show(path, previousFile, callback) {
     if (!this.containerEl)
       return;
+    this.applyBackgroundStyles();
     this.currentPath = path;
     this.previousFile = previousFile;
     this.currentCallback = callback;
@@ -501,11 +600,13 @@ var LockOverlay = class {
       this.inputEl.value = "";
       this.errorEl.textContent = "";
       this.updateLockoutUI();
-      if (!this.lockoutUntil || Date.now() > this.lockoutUntil) {
+      if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
+        this.startLockoutTimer();
+      } else {
         setTimeout(() => {
           var _a;
           return (_a = this.inputEl) == null ? void 0 : _a.focus();
-        }, 100);
+        }, 50);
       }
     }
   }
@@ -527,6 +628,22 @@ var LockOverlay = class {
       document.removeEventListener("keydown", this.boundHandleKeydown, true);
     }, 300);
   }
+  async handleSuccessfulUnlock() {
+    if (this.settings.intruderAlert && this.settings.totalIntruderAttempts > 0) {
+      new import_obsidian.Notice(
+        `\u{1F6A8} Security Alert: ${this.settings.totalIntruderAttempts} failed unlock attempt(s) detected.`,
+        1e4
+      );
+    }
+    this.settings.failedAttempts = 0;
+    this.settings.totalIntruderAttempts = 0;
+    this.settings.lockoutUntil = 0;
+    await this.saveSettings();
+    this.updateLockoutUI();
+    this.hide();
+    if (this.currentCallback)
+      this.currentCallback(true);
+  }
   async submit() {
     var _a, _b;
     const hash = ((_a = this.currentPath) == null ? void 0 : _a.passwordHash) || this.settings.passwordHash;
@@ -537,52 +654,80 @@ var LockOverlay = class {
         this.currentCallback(true);
       return;
     }
-    if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+    if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
       return;
     }
     const guess = this.inputEl.value;
     this.inputEl.value = "";
-    const isMatch = await verifyPassword(guess, hash, salt);
-    if (isMatch) {
-      if (this.settings.intruderAlert && this.failedAttempts > 0) {
-        new import_obsidian.Notice(`\u{1F6A8} Security Alert: ${this.failedAttempts} failed unlock attempt(s) detected.`, 1e4);
+    let isMatch = await verifyPassword(guess, hash, salt);
+    if (!isMatch && this.settings.recoveryCodeHash && this.settings.recoveryCodeSalt) {
+      const upperGuess = guess.trim().toUpperCase();
+      isMatch = await verifyPassword(upperGuess, this.settings.recoveryCodeHash, this.settings.recoveryCodeSalt);
+      if (isMatch) {
+        new import_obsidian.Notice("\u{1F513} Unlocked using Recovery Code (Global Skeleton Key).", 5e3);
       }
-      this.failedAttempts = 0;
-      this.updateLockoutUI();
-      this.hide();
-      if (this.currentCallback)
-        this.currentCallback(true);
+    }
+    if (isMatch) {
+      await this.handleSuccessfulUnlock();
     } else {
-      this.failedAttempts++;
+      this.settings.failedAttempts++;
+      this.settings.totalIntruderAttempts++;
       this.errorEl.textContent = "Incorrect password";
       this.inputEl.classList.remove("sg-shake");
       void this.inputEl.offsetWidth;
       this.inputEl.classList.add("sg-shake");
-      if (this.settings.maxFailedAttempts > 0 && this.failedAttempts >= this.settings.maxFailedAttempts) {
-        this.lockoutUntil = Date.now() + this.settings.lockoutDurationSeconds * 1e3;
-        this.failedAttempts = 0;
+      if (this.settings.maxFailedAttempts > 0 && this.settings.failedAttempts >= this.settings.maxFailedAttempts) {
+        this.settings.lockoutUntil = Date.now() + this.settings.lockoutDurationSeconds * 1e3;
+        this.settings.failedAttempts = 0;
+        await this.saveSettings();
         this.updateLockoutUI();
         this.startLockoutTimer();
       } else {
+        await this.saveSettings();
         this.updateLockoutUI();
       }
     }
   }
+  openRecoveryBypassModal() {
+    if (this.isRecoveryPromptOpen)
+      return;
+    if (!this.settings.recoveryCodeHash || !this.settings.recoveryCodeSalt) {
+      new import_obsidian.Notice("No Recovery Code is configured. Set one up in StoneGate settings.", 6e3);
+      return;
+    }
+    this.isRecoveryPromptOpen = true;
+    new RecoveryBypassModal(this.app, this.settings, async (verified) => {
+      if (verified) {
+        new import_obsidian.Notice("\u{1F513} Lockout bypassed using Recovery Code.", 5e3);
+        await this.handleSuccessfulUnlock();
+      }
+    }, () => {
+      this.isRecoveryPromptOpen = false;
+    }).open();
+  }
   updateLockoutUI() {
-    if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+    if (isLockedOut) {
       this.inputEl.disabled = true;
       this.submitBtnEl.disabled = true;
       this.errorEl.textContent = "";
       this.counterEl.textContent = "";
-      const secondsLeft = Math.ceil((this.lockoutUntil - Date.now()) / 1e3);
+      const secondsLeft = Math.ceil((this.settings.lockoutUntil - Date.now()) / 1e3);
       this.lockoutEl.textContent = `Locked out for ${secondsLeft} seconds`;
+      if (this.settings.recoveryCodeHash) {
+        this.recoveryBypassEl.style.display = "block";
+      }
     } else {
-      this.lockoutUntil = 0;
+      if (this.settings.lockoutUntil !== 0) {
+        this.settings.lockoutUntil = 0;
+        this.saveSettings().catch((err) => console.error("StoneGate: failed to save lockout settings", err));
+      }
       this.inputEl.disabled = false;
       this.submitBtnEl.disabled = false;
       this.lockoutEl.textContent = "";
-      if (this.settings.maxFailedAttempts > 0 && this.failedAttempts > 0) {
-        this.counterEl.textContent = `${this.failedAttempts} / ${this.settings.maxFailedAttempts} attempts`;
+      this.recoveryBypassEl.style.display = "none";
+      if (this.settings.maxFailedAttempts > 0 && this.settings.failedAttempts > 0) {
+        this.counterEl.textContent = `${this.settings.failedAttempts} / ${this.settings.maxFailedAttempts} attempts`;
       } else {
         this.counterEl.textContent = "";
       }
@@ -593,7 +738,7 @@ var LockOverlay = class {
       window.clearInterval(this.lockoutTimer);
     }
     this.lockoutTimer = window.setInterval(() => {
-      if (this.lockoutUntil && Date.now() < this.lockoutUntil) {
+      if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
         this.updateLockoutUI();
       } else {
         window.clearInterval(this.lockoutTimer);
@@ -615,6 +760,113 @@ var LockOverlay = class {
     document.removeEventListener("keydown", this.boundHandleKeydown, true);
     if (this.containerEl && this.containerEl.parentNode) {
       this.containerEl.parentNode.removeChild(this.containerEl);
+    }
+  }
+};
+var RecoveryBypassModal = class extends import_obsidian.Modal {
+  constructor(app, settings, onResult, onCloseCallback) {
+    super(app);
+    this.settings = settings;
+    this.onResult = onResult;
+    this.onCloseCallback = onCloseCallback;
+  }
+  onOpen() {
+    this.containerEl.addClass("sg-recovery-modal-container");
+    this.containerEl.addEventListener("keydown", (e) => {
+      e.stopPropagation();
+    });
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "\u{1F511} Emergency Recovery Bypass" });
+    const desc = contentEl.createEl("p", {
+      text: "You are currently locked out. Enter your 6-character Recovery Code to immediately bypass the lockout and unlock."
+    });
+    desc.style.marginBottom = "16px";
+    desc.style.color = "var(--text-muted)";
+    desc.style.fontSize = "0.9em";
+    const inputWrapper = contentEl.createDiv();
+    inputWrapper.style.position = "relative";
+    const input = inputWrapper.createEl("input", {
+      type: "text",
+      attr: {
+        placeholder: "XXXXXX",
+        maxlength: "6",
+        autocomplete: "off",
+        spellcheck: "false"
+      }
+    });
+    input.style.width = "100%";
+    input.style.textTransform = "uppercase";
+    input.style.letterSpacing = "4px";
+    input.style.textAlign = "center";
+    input.style.fontSize = "1.4em";
+    input.style.fontFamily = "monospace";
+    input.style.padding = "10px 14px";
+    input.style.boxSizing = "border-box";
+    input.style.marginBottom = "12px";
+    input.addEventListener("input", () => {
+      var _a;
+      const pos = (_a = input.selectionStart) != null ? _a : input.value.length;
+      input.value = input.value.toUpperCase();
+      input.setSelectionRange(pos, pos);
+    });
+    const errorEl = contentEl.createDiv();
+    errorEl.style.color = "var(--text-error)";
+    errorEl.style.fontSize = "0.85em";
+    errorEl.style.marginBottom = "16px";
+    errorEl.style.minHeight = "1.2em";
+    const btnRow = contentEl.createDiv();
+    btnRow.style.display = "flex";
+    btnRow.style.gap = "10px";
+    btnRow.style.justifyContent = "flex-end";
+    const cancelBtn = btnRow.createEl("button", { text: "Cancel" });
+    const unlockBtn = btnRow.createEl("button", { text: "Use Recovery Code", cls: "mod-cta" });
+    unlockBtn.style.marginTop = "0";
+    let submitted = false;
+    const attempt = async () => {
+      if (submitted)
+        return;
+      errorEl.textContent = "";
+      const code = input.value.trim().toUpperCase();
+      if (!code) {
+        errorEl.textContent = "Please enter your Recovery Code.";
+        return;
+      }
+      unlockBtn.disabled = true;
+      unlockBtn.textContent = "Verifying\u2026";
+      const isMatch = await verifyPassword(
+        code,
+        this.settings.recoveryCodeHash,
+        this.settings.recoveryCodeSalt
+      );
+      if (isMatch) {
+        submitted = true;
+        this.close();
+        this.onResult(true);
+      } else {
+        unlockBtn.disabled = false;
+        unlockBtn.textContent = "Use Recovery Code";
+        errorEl.textContent = "Invalid Recovery Code. Please check and try again.";
+        input.value = "";
+        new import_obsidian.Notice("\u274C Invalid Recovery Code.", 4e3);
+      }
+    };
+    unlockBtn.addEventListener("click", attempt);
+    input.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        attempt();
+      }
+    });
+    cancelBtn.addEventListener("click", () => {
+      this.close();
+    });
+    setTimeout(() => input.focus(), 80);
+  }
+  onClose() {
+    this.contentEl.empty();
+    if (this.onCloseCallback) {
+      this.onCloseCallback();
     }
   }
 };
@@ -811,6 +1063,12 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
+    new import_obsidian2.Setting(containerEl).setName("Custom Background URL/Path").setDesc("URL or local path to a custom background image. You can copy an Obsidian URL using the 'Copy Obsidian URL' feature (starts with app://obsidian.md/...).").addText(
+      (text) => text.setPlaceholder("https://example.com/image.jpg").setValue(this.plugin.settings.customBackgroundUrl || "").onChange(async (value) => {
+        this.plugin.settings.customBackgroundUrl = value.trim();
+        await this.plugin.saveSettings();
+      })
+    );
     containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
     const unlockMenuPwdSetting = new import_obsidian2.Setting(containerEl).setName("Unlock Menu Access Password").setDesc("Used to access the command palette list of hidden/locked paths");
     if (this.plugin.settings.unlockMenuPasswordHash) {
@@ -848,6 +1106,60 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
               this.display();
             }
           }).open();
+        })
+      );
+    }
+    new import_obsidian2.Setting(containerEl).setName("Unlock Menu Password Hint").setDesc("Hint shown when the Unlock Menu password is requested").addText(
+      (text) => text.setPlaceholder("Hint or custom message...").setValue(this.plugin.settings.unlockMenuPasswordHint || "").onChange(async (value) => {
+        this.plugin.settings.unlockMenuPasswordHint = value.trim() || void 0;
+        await this.plugin.saveSettings();
+      })
+    );
+    containerEl.createEl("h3", { text: "Recovery Options" });
+    const recoverySetting = new import_obsidian2.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
+    if (this.plugin.settings.recoveryCodeHash) {
+      recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton(
+        (btn) => btn.setButtonText("Remove Recovery Code").setWarning().onClick(() => {
+          new ConfirmPasswordModal(
+            this.app,
+            this.plugin,
+            void 0,
+            void 0,
+            "Master Password",
+            async (success) => {
+              if (success) {
+                this.plugin.settings.recoveryCodeHash = void 0;
+                this.plugin.settings.recoveryCodeSalt = void 0;
+                await this.plugin.saveSettings();
+                this.display();
+                new import_obsidian2.Notice("Recovery Code removed successfully.");
+              }
+            }
+          ).open();
+        })
+      );
+    } else {
+      recoverySetting.addButton(
+        (btn) => btn.setButtonText("Generate Recovery Code").setCta().onClick(() => {
+          new ConfirmPasswordModal(
+            this.app,
+            this.plugin,
+            void 0,
+            void 0,
+            "Master Password",
+            async (success) => {
+              if (success) {
+                const code = generateRecoveryCode();
+                const saltBytes = generateSalt();
+                const hash = await hashPassword(code.toUpperCase(), saltBytes);
+                this.plugin.settings.recoveryCodeHash = hash;
+                this.plugin.settings.recoveryCodeSalt = uint8ArrayToBase64(saltBytes);
+                await this.plugin.saveSettings();
+                this.display();
+                new RecoveryCodeDisplayModal(this.app, code).open();
+              }
+            }
+          ).open();
         })
       );
     }
@@ -940,13 +1252,14 @@ var PasswordModal = class extends import_obsidian2.Modal {
   }
 };
 var ConfirmPasswordModal = class extends import_obsidian2.Modal {
-  constructor(app, plugin, targetHash, targetSalt, targetName, onSubmit) {
+  constructor(app, plugin, targetHash, targetSalt, targetName, onSubmit, hint) {
     super(app);
     this.plugin = plugin;
     this.targetHash = targetHash;
     this.targetSalt = targetSalt;
     this.targetName = targetName;
     this.onSubmit = onSubmit;
+    this.hint = hint;
   }
   onOpen() {
     const { contentEl } = this;
@@ -954,6 +1267,10 @@ var ConfirmPasswordModal = class extends import_obsidian2.Modal {
     contentEl.createEl("h2", { text: `Confirm ${this.targetName}` });
     contentEl.createEl("p", { text: "Please enter the password to continue." });
     const input = createInputWithEye(contentEl, "Password");
+    if (this.hint) {
+      const hintEl = contentEl.createDiv("sg-hint");
+      hintEl.textContent = this.hint;
+    }
     const errorEl = contentEl.createDiv("sg-error");
     const submitBtn = contentEl.createEl("button", { text: "Confirm", cls: "mod-cta" });
     submitBtn.style.marginTop = "16px";
@@ -987,6 +1304,68 @@ var ConfirmPasswordModal = class extends import_obsidian2.Modal {
   onClose() {
     this.contentEl.empty();
     this.onSubmit(false);
+  }
+};
+var RecoveryCodeDisplayModal = class extends import_obsidian2.Modal {
+  constructor(app, code) {
+    super(app);
+    this.code = code;
+  }
+  onOpen() {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.createEl("h2", { text: "\u{1F511} Secure Recovery Code Generated", cls: "sg-modal-title" });
+    const desc = contentEl.createEl("p", {
+      text: "This recovery code acts as a Global Skeleton Key. It can bypass and unlock any locked folder or the vault itself if you forget your password.",
+      cls: "sg-modal-desc"
+    });
+    desc.style.marginBottom = "16px";
+    const warningBox = contentEl.createDiv("sg-warning-box");
+    warningBox.style.border = "1px solid var(--text-error)";
+    warningBox.style.backgroundColor = "rgba(255, 0, 0, 0.05)";
+    warningBox.style.padding = "12px 16px";
+    warningBox.style.borderRadius = "6px";
+    warningBox.style.marginBottom = "20px";
+    const warningTitle = warningBox.createEl("strong", { text: "\u26A0\uFE0F IMPORTANT WARNING:" });
+    warningTitle.style.color = "var(--text-error)";
+    warningTitle.style.display = "block";
+    warningTitle.style.marginBottom = "6px";
+    const warningText = warningBox.createEl("span", {
+      text: "Write this code down or save it in a secure password manager. For security reasons, the code is hashed before saving, and it CANNOT be shown or recovered again once you close this window."
+    });
+    warningText.style.fontSize = "0.9em";
+    const codeContainer = contentEl.createDiv("sg-recovery-code-container");
+    codeContainer.style.textAlign = "center";
+    codeContainer.style.margin = "24px 0";
+    codeContainer.style.padding = "16px";
+    codeContainer.style.borderRadius = "8px";
+    codeContainer.style.backgroundColor = "var(--background-secondary-alt)";
+    codeContainer.style.border = "2px dashed var(--interactive-accent)";
+    const codeEl = codeContainer.createEl("div", { text: this.code });
+    codeEl.style.fontSize = "2.4em";
+    codeEl.style.fontWeight = "bold";
+    codeEl.style.letterSpacing = "6px";
+    codeEl.style.color = "var(--interactive-accent)";
+    codeEl.style.fontFamily = "monospace";
+    codeEl.style.userSelect = "all";
+    const buttonRow = contentEl.createDiv("sg-button-row");
+    buttonRow.style.display = "flex";
+    buttonRow.style.justifyContent = "space-between";
+    buttonRow.style.marginTop = "24px";
+    const copyBtn = buttonRow.createEl("button", { text: "Copy Code", cls: "mod-cta" });
+    copyBtn.addEventListener("click", async () => {
+      await navigator.clipboard.writeText(this.code);
+      new import_obsidian2.Notice("Recovery code copied to clipboard!");
+      copyBtn.setText("Copied!");
+      setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
+    });
+    const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
+    closeBtn.addEventListener("click", () => {
+      this.close();
+    });
+  }
+  onClose() {
+    this.contentEl.empty();
   }
 };
 var AddPathModal = class extends import_obsidian2.Modal {
@@ -1289,9 +1668,20 @@ var StoneGatePlugin = class extends import_obsidian4.Plugin {
   }
   async onload() {
     await this.loadSettings();
-    this.overlay = new LockOverlay(this.app, this.settings);
+    this.overlay = new LockOverlay(this.app, this.settings, () => this.saveSettings());
     this.lockManager = new LockManager(this.app, this.settings, this.overlay);
-    if (this.settings.enabled && this.settings.lockOnStartup) {
+    const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
+    if (isLockedOut) {
+      const defaultPath = this.settings.protectedPaths.find((p) => p.id === "default" || p.path === "/");
+      if (defaultPath) {
+        this.lockManager.lockAll();
+        this.overlay.show(defaultPath, null, (success) => {
+          if (success) {
+            this.lockManager.unlock(defaultPath.id);
+          }
+        });
+      }
+    } else if (this.settings.enabled && this.settings.lockOnStartup) {
       const defaultPath = this.settings.protectedPaths.find((p) => p.id === "default" || p.path === "/");
       if (defaultPath && (defaultPath.passwordHash || this.settings.passwordHash)) {
         this.overlay.show(defaultPath, null, (success) => {
@@ -1364,7 +1754,8 @@ var StoneGatePlugin = class extends import_obsidian4.Plugin {
               if (success) {
                 openUnlockMenu();
               }
-            }
+            },
+            this.settings.unlockMenuPasswordHint
           ).open();
         } else {
           openUnlockMenu();
