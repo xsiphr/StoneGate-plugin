@@ -1,7 +1,7 @@
 {
   "id": "stonegate",
   "name": "StoneGate",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "minAppVersion": "1.6.6",
   "description": "Secure lock screen and vault protection for Desktop and Mobile.",
   "author": "xsiphr",
