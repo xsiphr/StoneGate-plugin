@@ -60,7 +60,7 @@ export class LockOverlay {
             return this.app.vault.getResourcePath(file);
           }
         }
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -517,7 +517,7 @@ class RecoveryBypassModal extends Modal {
 
     contentEl.createEl("h2", { text: "🔑 Emergency Recovery Bypass" });
 
-    const desc = contentEl.createEl("p", {
+    contentEl.createEl("p", {
       text: "You are currently locked out. Enter your 6-character Recovery Code to immediately bypass the lockout and unlock.",
       cls: "sg-recovery-desc"
     });

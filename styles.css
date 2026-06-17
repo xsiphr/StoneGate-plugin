@@ -14,8 +14,8 @@
     opacity: 1;
 }
 
-.sg-recovery-modal-container {
-    z-index: 10001 !important;
+body .modal-container.sg-recovery-modal-container {
+    z-index: 10001;
 }
 
 .sg-background-layer {
@@ -26,13 +26,13 @@
     pointer-events: none;
 }
 
-.sg-overlay-hidden {
-    display: none !important;
+body .sg-overlay-container.sg-overlay-hidden {
+    display: none;
 }
 
-.nav-folder[data-sg-ghost="true"],
-.nav-file[data-sg-ghost="true"] {
-    display: none !important;
+body .nav-files-container .nav-folder[data-sg-ghost="true"],
+body .nav-files-container .nav-file[data-sg-ghost="true"] {
+    display: none;
 }
 
 .sg-overlay-fade-out {

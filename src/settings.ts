@@ -15,7 +15,7 @@ export class StoneGateSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    new Setting(containerEl).setName("StoneGate Settings").setHeading();
+    new Setting(containerEl).setName("General").setHeading();
 
     // --- Protection Enable/Disable ---
     new Setting(containerEl)
@@ -25,64 +25,66 @@ export class StoneGateSettingTab extends PluginSettingTab {
         let isSyncing = false;
         toggle
           .setValue(this.plugin.settings.enabled)
-          .onChange(async (value) => {
-            if (isSyncing) return;
-            try {
-              if (value) {
-                if (!this.plugin.settings.passwordHash) {
-                  // Must set password first
+          .onChange((value) => {
+            void (async () => {
+              if (isSyncing) return;
+              try {
+                if (value) {
+                  if (!this.plugin.settings.passwordHash) {
+                    // Must set password first
+                    isSyncing = true;
+                    toggle.setValue(false);
+                    isSyncing = false;
+                    new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", async (success, hash, salt) => {
+                      try {
+                        if (success && hash && salt) {
+                          this.plugin.settings.passwordHash = hash;
+                          this.plugin.settings.passwordSalt = salt;
+                          this.plugin.settings.enabled = true;
+                          await this.plugin.saveSettings();
+                          this.display();
+                        } else {
+                          isSyncing = true;
+                          toggle.setValue(false);
+                          isSyncing = false;
+                        }
+                      } catch (e) {
+                        console.error("Password modal callback error:", e);
+                      }
+                    }).open();
+                  } else {
+                    this.plugin.settings.enabled = true;
+                    await this.plugin.saveSettings();
+                  }
+                } else {
+                  // Disabling requires confirmation
                   isSyncing = true;
-                  toggle.setValue(false);
+                  toggle.setValue(true);
                   isSyncing = false;
-                  new PasswordModal(this.app, this.plugin, undefined, undefined, "Master Password", async (success, hash, salt) => {
+                  new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
                     try {
-                      if (success && hash && salt) {
-                        this.plugin.settings.passwordHash = hash;
-                        this.plugin.settings.passwordSalt = salt;
-                        this.plugin.settings.enabled = true;
+                      if (success) {
+                        this.plugin.settings.enabled = false;
                         await this.plugin.saveSettings();
+                        this.plugin.lockManager.lockAll();
                         this.display();
                       } else {
                         isSyncing = true;
-                        toggle.setValue(false);
+                        toggle.setValue(true);
                         isSyncing = false;
                       }
                     } catch (e) {
-                      console.error("Password modal callback error:", e);
+                      console.error("Confirm password modal callback error:", e);
                     }
                   }).open();
-                } else {
-                  this.plugin.settings.enabled = true;
-                  await this.plugin.saveSettings();
                 }
-              } else {
-                // Disabling requires confirmation
+              } catch (e) {
+                console.error("Failed to toggle StoneGate:", e);
                 isSyncing = true;
-                toggle.setValue(true);
+                toggle.setValue(!value);
                 isSyncing = false;
-                new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-                  try {
-                    if (success) {
-                      this.plugin.settings.enabled = false;
-                      await this.plugin.saveSettings();
-                      this.plugin.lockManager.lockAll();
-                      this.display();
-                    } else {
-                      isSyncing = true;
-                      toggle.setValue(true);
-                      isSyncing = false;
-                    }
-                  } catch (e) {
-                    console.error("Confirm password modal callback error:", e);
-                  }
-                }).open();
               }
-            } catch (e) {
-              console.error("Failed to toggle StoneGate:", e);
-              isSyncing = true;
-              toggle.setValue(!value);
-              isSyncing = false;
-            }
+            })();
           });
       });
 
@@ -110,7 +112,8 @@ export class StoneGateSettingTab extends PluginSettingTab {
         )
         .addButton((btn) => {
           btn.setButtonText("Remove");
-          (btn as any).setDestructive();
+          // @ts-expect-error: setDestructive is present in newer Obsidian versions
+          btn.setDestructive();
           btn.onClick(() => {
             new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
               if (success) {
@@ -189,9 +192,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.lockOnStartup)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.lockOnStartup = value;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -201,9 +204,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.lockOnBlur)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.lockOnBlur = value;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -214,11 +217,11 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("3")
           .setValue(String(this.plugin.settings.blurGracePeriodSeconds))
-          .onChange(async (value) => {
+          .onChange((value) => {
             const num = parseInt(value, 10);
             if (!isNaN(num) && num >= 0) {
               this.plugin.settings.blurGracePeriodSeconds = num;
-              await this.plugin.saveSettings();
+              void this.plugin.saveSettings();
             }
           })
       );
@@ -230,11 +233,11 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("3")
           .setValue(String(this.plugin.settings.maxFailedAttempts))
-          .onChange(async (value) => {
+          .onChange((value) => {
             const num = parseInt(value, 10);
             if (!isNaN(num) && num >= 0) {
               this.plugin.settings.maxFailedAttempts = num;
-              await this.plugin.saveSettings();
+              void this.plugin.saveSettings();
             }
           })
       );
@@ -245,11 +248,11 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("60")
           .setValue(String(this.plugin.settings.lockoutDurationSeconds))
-          .onChange(async (value) => {
+          .onChange((value) => {
             const num = parseInt(value, 10);
             if (!isNaN(num) && num >= 0) {
               this.plugin.settings.lockoutDurationSeconds = num;
-              await this.plugin.saveSettings();
+              void this.plugin.saveSettings();
             }
           })
       );
@@ -260,9 +263,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.intruderAlert)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.intruderAlert = value;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -276,9 +279,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
       .addToggle((toggle) =>
         toggle
           .setValue(this.plugin.settings.showStoneGateTitle)
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.showStoneGateTitle = value;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -289,9 +292,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("StoneGate")
           .setValue(this.plugin.settings.customTitle || "")
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.customTitle = value.trim() || undefined;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
@@ -302,9 +305,9 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("https://example.com/image.jpg")
           .setValue(this.plugin.settings.customBackgroundUrl || "")
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.customBackgroundUrl = value.trim();
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           });
         new ImagePathSuggest(this.app, text.inputEl);
       });
@@ -335,7 +338,8 @@ export class StoneGateSettingTab extends PluginSettingTab {
         )
         .addButton((btn) => {
           btn.setButtonText("Remove");
-          (btn as any).setDestructive();
+          // @ts-expect-error: setDestructive is present in newer Obsidian versions
+          btn.setDestructive();
           btn.onClick(() => {
             new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
               if (success) {
@@ -372,13 +376,13 @@ export class StoneGateSettingTab extends PluginSettingTab {
         text
           .setPlaceholder("Hint or custom message...")
           .setValue(this.plugin.settings.unlockMenuPasswordHint || "")
-          .onChange(async (value) => {
+          .onChange((value) => {
             this.plugin.settings.unlockMenuPasswordHint = value.trim() || undefined;
-            await this.plugin.saveSettings();
+            void this.plugin.saveSettings();
           })
       );
 
-    new Setting(containerEl).setName("Recovery Options").setHeading();
+    new Setting(containerEl).setName("Security").setHeading();
 
     const recoverySetting = new Setting(containerEl)
       .setName("Recovery Code (Global Skeleton Key)")
@@ -389,7 +393,8 @@ export class StoneGateSettingTab extends PluginSettingTab {
         .setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).")
         .addButton((btn) => {
           btn.setButtonText("Remove Recovery Code");
-          (btn as any).setDestructive();
+          // @ts-expect-error: setDestructive is present in newer Obsidian versions
+          btn.setDestructive();
           btn.onClick(() => {
             new ConfirmPasswordModal(
               this.app,
@@ -509,7 +514,7 @@ export class PasswordModal extends Modal {
       const p1 = newPasswordInput.value;
       const p2 = confirmPasswordInput.value;
 
-      if (!p1 || p1.length < 4 || !/^[\x00-\x7F]*$/.test(p1)) {
+      if (!p1 || p1.length < 4 || !/^[\u0000-\u007F]*$/.test(p1)) {
         errorEl.textContent = "Password must be at least 4 ASCII characters.";
         return;
       }
@@ -643,16 +648,16 @@ export class RecoveryCodeDisplayModal extends Modal {
 
     const warningBox = contentEl.createDiv("sg-warning-box sg-display-warning-box");
     
-    const warningTitle = warningBox.createEl("strong", { text: "⚠️ IMPORTANT WARNING:", cls: "sg-display-warning-title" });
+    warningBox.createEl("strong", { text: "⚠️ IMPORTANT WARNING:", cls: "sg-display-warning-title" });
 
-    const warningText = warningBox.createEl("span", {
+    warningBox.createEl("span", {
       text: "Write this code down or save it in a secure password manager. For security reasons, the code is hashed before saving, and it CANNOT be shown or recovered again once you close this window.",
       cls: "sg-display-warning-text"
     });
 
     const codeContainer = contentEl.createDiv("sg-recovery-code-container sg-display-code-container");
 
-    const codeEl = codeContainer.createEl("div", { text: this.code, cls: "sg-display-code-el" });
+    codeContainer.createEl("div", { text: this.code, cls: "sg-display-code-el" });
 
     const buttonRow = contentEl.createDiv("sg-button-row sg-display-button-row");
 
@@ -762,7 +767,7 @@ class AddPathModal extends Modal {
     });
 
     // Description text for the new toggle
-    const menuDesc = contentEl.createEl("p", {
+    contentEl.createEl("p", {
       text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed.",
       cls: "sg-modal-desc-small"
     });
@@ -922,7 +927,7 @@ class EditPathModal extends Modal {
     });
 
     // Description text for the new toggle
-    const menuDesc = contentEl.createEl("p", {
+    contentEl.createEl("p", {
       text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed.",
       cls: "sg-modal-desc-small"
     });
