@@ -3,3 +3,6 @@ dist/
 *.js.map
 main.js
 scratch/
+data.json
+.DS_Store
+
