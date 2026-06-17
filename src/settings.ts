@@ -810,7 +810,11 @@ class AddPathModal extends Modal {
     menuToggle.style.flexShrink = "0";
     const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
     menuLabel.style.cursor = "pointer";
-    menuLabel.addEventListener("click", () => menuToggle.click());
+    menuLabel.addEventListener("click", () => {
+      if (!menuToggle.disabled) {
+        menuToggle.click();
+      }
+    });
 
     // Description text for the new toggle
     const menuDesc = contentEl.createEl("p", {
@@ -820,6 +824,16 @@ class AddPathModal extends Modal {
     menuDesc.style.color = "var(--text-muted)";
     menuDesc.style.marginTop = "-12px";
     menuDesc.style.marginBottom = "16px";
+
+    // Enforce dependency logic
+    ghostToggle.addEventListener("change", () => {
+      if (ghostToggle.checked) {
+        menuToggle.checked = true;
+        menuToggle.disabled = true;
+      } else {
+        menuToggle.disabled = false;
+      }
+    });
 
     // Set path password
     let tempHash: string | undefined = undefined;
@@ -990,7 +1004,11 @@ class EditPathModal extends Modal {
     menuToggle.checked = !!this.pathObj.showInUnlockMenu;
     const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
     menuLabel.style.cursor = "pointer";
-    menuLabel.addEventListener("click", () => menuToggle.click());
+    menuLabel.addEventListener("click", () => {
+      if (!menuToggle.disabled) {
+        menuToggle.click();
+      }
+    });
 
     // Description text for the new toggle
     const menuDesc = contentEl.createEl("p", {
@@ -1000,6 +1018,22 @@ class EditPathModal extends Modal {
     menuDesc.style.color = "var(--text-muted)";
     menuDesc.style.marginTop = "-12px";
     menuDesc.style.marginBottom = "16px";
+
+    // Enforce initial disabled state if Ghost Mode was already enabled
+    if (ghostToggle.checked) {
+      menuToggle.checked = true;
+      menuToggle.disabled = true;
+    }
+
+    // Enforce dependency logic
+    ghostToggle.addEventListener("change", () => {
+      if (ghostToggle.checked) {
+        menuToggle.checked = true;
+        menuToggle.disabled = true;
+      } else {
+        menuToggle.disabled = false;
+      }
+    });
 
     const pwdControls = contentEl.createDiv();
     pwdControls.style.display = "flex";
