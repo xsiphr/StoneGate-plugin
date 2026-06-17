@@ -98,10 +98,10 @@ var LockManager = class {
     this.updateGhostModeStyles();
   }
   setupListeners() {
-    document.addEventListener("mousemove", this.boundActivityHandler);
-    document.addEventListener("keydown", this.boundActivityHandler);
-    document.addEventListener("mousedown", this.boundActivityHandler);
-    document.addEventListener("touchstart", this.boundActivityHandler);
+    activeDocument.addEventListener("mousemove", this.boundActivityHandler);
+    activeDocument.addEventListener("keydown", this.boundActivityHandler);
+    activeDocument.addEventListener("mousedown", this.boundActivityHandler);
+    activeDocument.addEventListener("touchstart", this.boundActivityHandler);
     window.addEventListener("blur", this.boundBlurHandler);
     window.addEventListener("focus", this.boundFocusHandler);
   }
@@ -109,7 +109,7 @@ var LockManager = class {
     if (this.activityUpdatePending)
       return;
     this.activityUpdatePending = true;
-    setTimeout(() => {
+    window.setTimeout(() => {
       this.lastActivityTime = Date.now();
       this.activityUpdatePending = false;
     }, 1e3);
@@ -291,12 +291,12 @@ var LockManager = class {
       this.ghostModeObserver = new MutationObserver(() => {
         this.debouncedUpdateGhostMode();
       });
-      this.ghostModeObserver.observe(document.body, { childList: true, subtree: true });
+      this.ghostModeObserver.observe(activeDocument.body, { childList: true, subtree: true });
     }
     this.updateGhostModeDOM();
   }
   clearGhostModeAttributes() {
-    const els = document.querySelectorAll("[data-sg-ghost]");
+    const els = activeDocument.querySelectorAll("[data-sg-ghost]");
     els.forEach((el) => el.removeAttribute("data-sg-ghost"));
   }
   updateGhostModeDOM() {
@@ -312,7 +312,7 @@ var LockManager = class {
         lockedPaths.add(path.path);
       }
     }
-    const titleElements = document.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
+    const titleElements = activeDocument.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
     titleElements.forEach((titleEl) => {
       const path = titleEl.getAttribute("data-path");
       const parentEl = titleEl.parentElement;
@@ -330,10 +330,10 @@ var LockManager = class {
     });
   }
   dispose() {
-    document.removeEventListener("mousemove", this.boundActivityHandler);
-    document.removeEventListener("keydown", this.boundActivityHandler);
-    document.removeEventListener("mousedown", this.boundActivityHandler);
-    document.removeEventListener("touchstart", this.boundActivityHandler);
+    activeDocument.removeEventListener("mousemove", this.boundActivityHandler);
+    activeDocument.removeEventListener("keydown", this.boundActivityHandler);
+    activeDocument.removeEventListener("mousedown", this.boundActivityHandler);
+    activeDocument.removeEventListener("touchstart", this.boundActivityHandler);
     window.removeEventListener("blur", this.boundBlurHandler);
     window.removeEventListener("focus", this.boundFocusHandler);
     if (this.idleTimerId !== null) {
@@ -534,7 +534,7 @@ var LockOverlay = class {
     }
   }
   createOverlay() {
-    this.containerEl = document.createElement("div");
+    this.containerEl = activeDocument.createElement("div");
     this.containerEl.addClass("sg-overlay-container", "sg-overlay-hidden");
     this.bgLayerEl = this.containerEl.createDiv("sg-background-layer");
     const card = this.containerEl.createDiv("sg-overlay-card");
@@ -547,16 +547,16 @@ var LockOverlay = class {
       attr: { placeholder: "Enter password" }
     });
     const eyeToggle = inputWrapper.createEl("button", { cls: "sg-eye-toggle" });
-    eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    (0, import_obsidian2.setIcon)(eyeToggle, "eye");
     eyeToggle.addEventListener("click", () => {
       if (!this.inputEl)
         return;
       const isPassword = this.inputEl.type === "password";
       this.inputEl.type = isPassword ? "text" : "password";
       if (isPassword) {
-        eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+        (0, import_obsidian2.setIcon)(eyeToggle, "eye-off");
       } else {
-        eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        (0, import_obsidian2.setIcon)(eyeToggle, "eye");
       }
     });
     this.hintEl = card.createDiv("sg-hint");
@@ -581,26 +581,26 @@ var LockOverlay = class {
     this.containerEl.addEventListener("keydown", (e) => {
       e.stopPropagation();
     });
-    document.body.appendChild(this.containerEl);
+    activeDocument.body.appendChild(this.containerEl);
     this.observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
         if (mutation.type === "childList") {
           const removedNodes = Array.from(mutation.removedNodes);
           if (this.containerEl && removedNodes.includes(this.containerEl)) {
-            document.body.appendChild(this.containerEl);
+            activeDocument.body.appendChild(this.containerEl);
           }
         }
       });
     });
-    this.observer.observe(document.body, { childList: true });
+    this.observer.observe(activeDocument.body, { childList: true });
   }
   handleKeydown(e) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden"))
       return;
-    const isRecoveryModalOpen = !!document.querySelector(".sg-recovery-modal-container");
-    const recoveryModal = document.querySelector(".sg-recovery-modal-container");
+    const isRecoveryModalOpen = !!activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryModal = activeDocument.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal == null ? void 0 : recoveryModal.querySelector("input");
-    const activeEl = typeof activeDocument !== "undefined" && activeDocument ? activeDocument.activeElement : document.activeElement;
+    const activeEl = activeDocument.activeElement;
     const isFocusOnOurInput = activeEl === this.inputEl || recoveryInput && activeEl === recoveryInput;
     const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
     if (hasModifier) {
@@ -664,7 +664,7 @@ var LockOverlay = class {
     this.containerEl.removeClass("sg-overlay-hidden");
     this.containerEl.removeClass("sg-overlay-fade-out");
     this.containerEl.addClass("sg-overlay-fade-in");
-    const workspace = document.body.querySelector(".workspace");
+    const workspace = activeDocument.body.querySelector(".workspace");
     if (workspace)
       workspace.setCssStyles({ pointerEvents: "none" });
     window.addEventListener("keydown", this.boundHandleKeydown, { capture: true });
@@ -682,7 +682,7 @@ var LockOverlay = class {
       if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
         this.startLockoutTimer();
       } else {
-        setTimeout(() => {
+        window.setTimeout(() => {
           var _a;
           return (_a = this.inputEl) == null ? void 0 : _a.focus();
         }, 50);
@@ -697,11 +697,11 @@ var LockOverlay = class {
       return;
     this.containerEl.removeClass("sg-overlay-fade-in");
     this.containerEl.addClass("sg-overlay-fade-out");
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (this.containerEl) {
         this.containerEl.addClass("sg-overlay-hidden");
       }
-      const workspace = document.body.querySelector(".workspace");
+      const workspace = activeDocument.body.querySelector(".workspace");
       if (workspace)
         workspace.setCssStyles({ pointerEvents: "" });
       window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
@@ -799,7 +799,7 @@ var LockOverlay = class {
     } else {
       if (this.settings.lockoutUntil !== 0) {
         this.settings.lockoutUntil = 0;
-        this.saveSettings().catch((err) => console.error("StoneGate: failed to save lockout settings", err));
+        void this.saveSettings().catch((err) => console.error("StoneGate: failed to save lockout settings", err));
       }
       this.inputEl.disabled = false;
       this.submitBtnEl.disabled = false;
@@ -922,7 +922,7 @@ var RecoveryBypassModal = class extends import_obsidian2.Modal {
     cancelBtn.addEventListener("click", () => {
       this.close();
     });
-    setTimeout(() => input.focus(), 80);
+    window.setTimeout(() => input.focus(), 80);
   }
   onClose() {
     this.contentEl.empty();
@@ -1018,8 +1018,10 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
             }
           }).open();
         })
-      ).addButton(
-        (btn) => btn.setButtonText("Remove").setWarning().onClick(() => {
+      ).addButton((btn) => {
+        btn.setButtonText("Remove");
+        btn.setDestructive();
+        btn.onClick(() => {
           new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
             if (success) {
               this.plugin.settings.passwordHash = void 0;
@@ -1029,8 +1031,8 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
               this.display();
             }
           }).open();
-        })
-      );
+        });
+      });
     } else {
       passwordSetting.addButton(
         (btn) => btn.setButtonText("Set Password").setCta().onClick(() => {
@@ -1145,8 +1147,10 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
             }
           }).open();
         })
-      ).addButton(
-        (btn) => btn.setButtonText("Remove").setWarning().onClick(() => {
+      ).addButton((btn) => {
+        btn.setButtonText("Remove");
+        btn.setDestructive();
+        btn.onClick(() => {
           new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
             if (success) {
               this.plugin.settings.unlockMenuPasswordHash = void 0;
@@ -1155,8 +1159,8 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
               this.display();
             }
           }).open();
-        })
-      );
+        });
+      });
     } else {
       unlockMenuPwdSetting.addButton(
         (btn) => btn.setButtonText("Set Password").setCta().onClick(() => {
@@ -1180,8 +1184,10 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
     new import_obsidian3.Setting(containerEl).setName("Recovery Options").setHeading();
     const recoverySetting = new import_obsidian3.Setting(containerEl).setName("Recovery Code (Global Skeleton Key)").setDesc("A 6-character recovery code that can bypass and unlock any path if you forget your password.");
     if (this.plugin.settings.recoveryCodeHash) {
-      recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton(
-        (btn) => btn.setButtonText("Remove Recovery Code").setWarning().onClick(() => {
+      recoverySetting.setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).").addButton((btn) => {
+        btn.setButtonText("Remove Recovery Code");
+        btn.setDestructive();
+        btn.onClick(() => {
           new ConfirmPasswordModal(
             this.app,
             this.plugin,
@@ -1198,8 +1204,8 @@ var StoneGateSettingTab = class extends import_obsidian3.PluginSettingTab {
               }
             }
           ).open();
-        })
-      );
+        });
+      });
     } else {
       recoverySetting.addButton(
         (btn) => btn.setButtonText("Generate Recovery Code").setCta().onClick(() => {
@@ -1231,14 +1237,14 @@ function createInputWithEye(container, placeholder) {
   const wrapper = container.createDiv("sg-modal-input-container");
   const input = wrapper.createEl("input", { type: "password", attr: { placeholder } });
   const eyeBtn = wrapper.createEl("button", { cls: "sg-eye-toggle" });
-  eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  (0, import_obsidian3.setIcon)(eyeBtn, "eye");
   eyeBtn.addEventListener("click", () => {
     const isPassword = input.type === "password";
     input.type = isPassword ? "text" : "password";
     if (isPassword) {
-      eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+      (0, import_obsidian3.setIcon)(eyeBtn, "eye-off");
     } else {
-      eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+      (0, import_obsidian3.setIcon)(eyeBtn, "eye");
     }
   });
   return input;
@@ -1303,7 +1309,7 @@ var PasswordModal = class extends import_obsidian3.Modal {
     confirmPasswordInput.addEventListener("keydown", handleKey);
     if (currentInput)
       currentInput.addEventListener("keydown", handleKey);
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (currentInput)
         currentInput.focus();
       else
@@ -1363,7 +1369,7 @@ var ConfirmPasswordModal = class extends import_obsidian3.Modal {
         submit();
       }
     });
-    setTimeout(() => input.focus(), 50);
+    window.setTimeout(() => input.focus(), 50);
   }
   onClose() {
     this.contentEl.empty();
@@ -1398,7 +1404,7 @@ var RecoveryCodeDisplayModal = class extends import_obsidian3.Modal {
       await navigator.clipboard.writeText(this.code);
       new import_obsidian3.Notice("Recovery code copied to clipboard!");
       copyBtn.setText("Copied!");
-      setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
+      window.setTimeout(() => copyBtn.setText("Copy Code"), 2e3);
     });
     const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
     closeBtn.addEventListener("click", () => {
@@ -1539,12 +1545,12 @@ var AddPathModal = class extends import_obsidian3.Modal {
     pathInput.addEventListener("keydown", handleKey);
     labelInput.addEventListener("keydown", handleKey);
     timeoutInput.addEventListener("keydown", handleKey);
-    document.addEventListener("click", (e) => {
+    activeDocument.addEventListener("click", (e) => {
       if (!pathWrapper.contains(e.target)) {
         dropdown.hide();
       }
     });
-    setTimeout(() => pathInput.focus(), 50);
+    window.setTimeout(() => pathInput.focus(), 50);
   }
   onClose() {
     this.contentEl.empty();
@@ -1670,7 +1676,7 @@ var EditPathModal = class extends import_obsidian3.Modal {
     labelInput.addEventListener("keydown", handleKey);
     timeoutInput.addEventListener("keydown", handleKey);
     hintInput.addEventListener("keydown", handleKey);
-    setTimeout(() => labelInput.focus(), 50);
+    window.setTimeout(() => labelInput.focus(), 50);
   }
   onClose() {
     this.contentEl.empty();
@@ -1731,7 +1737,9 @@ var StoneGatePlugin = class extends import_obsidian5.Plugin {
   }
   async onload() {
     await this.loadSettings();
-    this.overlay = new LockOverlay(this.app, this.settings, () => this.saveSettings());
+    this.overlay = new LockOverlay(this.app, this.settings, async () => {
+      await this.saveSettings();
+    });
     this.lockManager = new LockManager(this.app, this.settings, this.overlay);
     const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
     if (isLockedOut) {
@@ -1767,7 +1775,7 @@ var StoneGatePlugin = class extends import_obsidian5.Plugin {
     );
     this.addSettingTab(new StoneGateSettingTab(this.app, this));
     this.addCommand({
-      id: "stonegate-lock-vault",
+      id: "lock-vault",
       name: "Lock vault now",
       callback: () => {
         if (this.settings.enabled) {
@@ -1784,7 +1792,7 @@ var StoneGatePlugin = class extends import_obsidian5.Plugin {
       }
     });
     this.addCommand({
-      id: "stonegate-lock-folder",
+      id: "lock-folder",
       name: "Lock current folder",
       callback: () => {
         const file = this.app.workspace.getActiveFile();
@@ -1798,7 +1806,7 @@ var StoneGatePlugin = class extends import_obsidian5.Plugin {
       }
     });
     this.addCommand({
-      id: "stonegate-unlock-path",
+      id: "unlock-path",
       name: "Unlock hidden/locked path",
       callback: () => {
         if (!this.settings.enabled)

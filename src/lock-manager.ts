@@ -49,10 +49,10 @@ export class LockManager {
   }
 
   private setupListeners() {
-    document.addEventListener("mousemove", this.boundActivityHandler);
-    document.addEventListener("keydown", this.boundActivityHandler);
-    document.addEventListener("mousedown", this.boundActivityHandler);
-    document.addEventListener("touchstart", this.boundActivityHandler);
+    activeDocument.addEventListener("mousemove", this.boundActivityHandler);
+    activeDocument.addEventListener("keydown", this.boundActivityHandler);
+    activeDocument.addEventListener("mousedown", this.boundActivityHandler);
+    activeDocument.addEventListener("touchstart", this.boundActivityHandler);
     window.addEventListener("blur", this.boundBlurHandler);
     window.addEventListener("focus", this.boundFocusHandler);
   }
@@ -60,7 +60,7 @@ export class LockManager {
   private throttleActivity() {
     if (this.activityUpdatePending) return;
     this.activityUpdatePending = true;
-    setTimeout(() => {
+    window.setTimeout(() => {
       this.lastActivityTime = Date.now();
       this.activityUpdatePending = false;
     }, 1000);
@@ -273,14 +273,14 @@ export class LockManager {
       this.ghostModeObserver = new MutationObserver(() => {
         this.debouncedUpdateGhostMode();
       });
-      this.ghostModeObserver.observe(document.body, { childList: true, subtree: true });
+      this.ghostModeObserver.observe(activeDocument.body, { childList: true, subtree: true });
     }
 
     this.updateGhostModeDOM();
   }
 
   private clearGhostModeAttributes() {
-    const els = document.querySelectorAll("[data-sg-ghost]");
+    const els = activeDocument.querySelectorAll("[data-sg-ghost]");
     els.forEach(el => el.removeAttribute("data-sg-ghost"));
   }
 
@@ -298,7 +298,7 @@ export class LockManager {
       }
     }
 
-    const titleElements = document.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
+    const titleElements = activeDocument.querySelectorAll(".nav-folder-title[data-path], .nav-file-title[data-path]");
     titleElements.forEach(titleEl => {
       const path = titleEl.getAttribute("data-path");
       const parentEl = titleEl.parentElement;
@@ -317,10 +317,10 @@ export class LockManager {
   }
 
   public dispose() {
-    document.removeEventListener("mousemove", this.boundActivityHandler);
-    document.removeEventListener("keydown", this.boundActivityHandler);
-    document.removeEventListener("mousedown", this.boundActivityHandler);
-    document.removeEventListener("touchstart", this.boundActivityHandler);
+    activeDocument.removeEventListener("mousemove", this.boundActivityHandler);
+    activeDocument.removeEventListener("keydown", this.boundActivityHandler);
+    activeDocument.removeEventListener("mousedown", this.boundActivityHandler);
+    activeDocument.removeEventListener("touchstart", this.boundActivityHandler);
     window.removeEventListener("blur", this.boundBlurHandler);
     window.removeEventListener("focus", this.boundFocusHandler);
 

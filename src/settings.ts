@@ -1,4 +1,4 @@
-import { App, Modal, PluginSettingTab, Setting, TFolder, Notice, AbstractInputSuggest } from "obsidian";
+import { App, Modal, PluginSettingTab, Setting, Notice, AbstractInputSuggest, setIcon } from "obsidian";
 import type StoneGatePlugin from "./main";
 import { ProtectedPath } from "./types";
 import { generateSalt, hashPassword, uint8ArrayToBase64, verifyPassword, generateRecoveryCode } from "./crypto";
@@ -108,22 +108,21 @@ export class StoneGateSettingTab extends PluginSettingTab {
               }).open();
             })
         )
-        .addButton((btn) =>
-          btn
-            .setButtonText("Remove")
-            .setWarning()
-            .onClick(() => {
-              new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
-                if (success) {
-                  this.plugin.settings.passwordHash = undefined;
-                  this.plugin.settings.passwordSalt = undefined;
-                  this.plugin.settings.enabled = false; // Disable if no password
-                  await this.plugin.saveSettings();
-                  this.display();
-                }
-              }).open();
-            })
-        );
+        .addButton((btn) => {
+          btn.setButtonText("Remove");
+          (btn as any).setDestructive();
+          btn.onClick(() => {
+            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.passwordHash, this.plugin.settings.passwordSalt, "Master Password", async (success) => {
+              if (success) {
+                this.plugin.settings.passwordHash = undefined;
+                this.plugin.settings.passwordSalt = undefined;
+                this.plugin.settings.enabled = false; // Disable if no password
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            }).open();
+          });
+        });
 
 
 
@@ -334,21 +333,20 @@ export class StoneGateSettingTab extends PluginSettingTab {
               }).open();
             })
         )
-        .addButton((btn) =>
-          btn
-            .setButtonText("Remove")
-            .setWarning()
-            .onClick(() => {
-              new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
-                if (success) {
-                  this.plugin.settings.unlockMenuPasswordHash = undefined;
-                  this.plugin.settings.unlockMenuPasswordSalt = undefined;
-                  await this.plugin.saveSettings();
-                  this.display();
-                }
-              }).open();
-            })
-        );
+        .addButton((btn) => {
+          btn.setButtonText("Remove");
+          (btn as any).setDestructive();
+          btn.onClick(() => {
+            new ConfirmPasswordModal(this.app, this.plugin, this.plugin.settings.unlockMenuPasswordHash, this.plugin.settings.unlockMenuPasswordSalt, "Unlock Menu Password", async (success) => {
+              if (success) {
+                this.plugin.settings.unlockMenuPasswordHash = undefined;
+                this.plugin.settings.unlockMenuPasswordSalt = undefined;
+                await this.plugin.saveSettings();
+                this.display();
+              }
+            }).open();
+          });
+        });
     } else {
       unlockMenuPwdSetting.addButton((btn) =>
         btn
@@ -389,29 +387,28 @@ export class StoneGateSettingTab extends PluginSettingTab {
     if (this.plugin.settings.recoveryCodeHash) {
       recoverySetting
         .setDesc("A recovery code is configured. You can use it to bypass lock screens. (For security, only the hash is stored; the code cannot be shown again).")
-        .addButton((btn) =>
-          btn
-            .setButtonText("Remove Recovery Code")
-            .setWarning()
-            .onClick(() => {
-              new ConfirmPasswordModal(
-                this.app,
-                this.plugin,
-                undefined,
-                undefined,
-                "Master Password",
-                async (success) => {
-                  if (success) {
-                    this.plugin.settings.recoveryCodeHash = undefined;
-                    this.plugin.settings.recoveryCodeSalt = undefined;
-                    await this.plugin.saveSettings();
-                    this.display();
-                    new Notice("Recovery Code removed successfully.");
-                  }
+        .addButton((btn) => {
+          btn.setButtonText("Remove Recovery Code");
+          (btn as any).setDestructive();
+          btn.onClick(() => {
+            new ConfirmPasswordModal(
+              this.app,
+              this.plugin,
+              undefined,
+              undefined,
+              "Master Password",
+              async (success) => {
+                if (success) {
+                  this.plugin.settings.recoveryCodeHash = undefined;
+                  this.plugin.settings.recoveryCodeSalt = undefined;
+                  await this.plugin.saveSettings();
+                  this.display();
+                  new Notice("Recovery Code removed successfully.");
                 }
-              ).open();
-            })
-        );
+              }
+            ).open();
+          });
+        });
     } else {
       recoverySetting.addButton((btn) =>
         btn
@@ -450,14 +447,14 @@ function createInputWithEye(container: HTMLElement, placeholder: string): HTMLIn
   const input = wrapper.createEl("input", { type: "password", attr: { placeholder } });
   
   const eyeBtn = wrapper.createEl("button", { cls: "sg-eye-toggle" });
-  eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+  setIcon(eyeBtn, "eye");
   eyeBtn.addEventListener("click", () => {
     const isPassword = input.type === "password";
     input.type = isPassword ? "text" : "password";
     if (isPassword) {
-      eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+      setIcon(eyeBtn, "eye-off");
     } else {
-      eyeBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+      setIcon(eyeBtn, "eye");
     }
   });
   return input;
@@ -539,7 +536,7 @@ export class PasswordModal extends Modal {
     confirmPasswordInput.addEventListener("keydown", handleKey);
     if (currentInput) currentInput.addEventListener("keydown", handleKey);
     
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (currentInput) currentInput.focus();
       else newPasswordInput.focus();
     }, 50);
@@ -615,7 +612,7 @@ export class ConfirmPasswordModal extends Modal {
         submit();
       }
     });
-    setTimeout(() => input.focus(), 50);
+    window.setTimeout(() => input.focus(), 50);
   }
 
   onClose() {
@@ -664,7 +661,7 @@ export class RecoveryCodeDisplayModal extends Modal {
       await navigator.clipboard.writeText(this.code);
       new Notice("Recovery code copied to clipboard!");
       copyBtn.setText("Copied!");
-      setTimeout(() => copyBtn.setText("Copy Code"), 2000);
+      window.setTimeout(() => copyBtn.setText("Copy Code"), 2000);
     });
 
     const closeBtn = buttonRow.createEl("button", { text: "Done / I Saved It" });
@@ -849,13 +846,13 @@ class AddPathModal extends Modal {
     timeoutInput.addEventListener("keydown", handleKey);
 
     // Close dropdown when clicking outside
-    document.addEventListener("click", (e) => {
+    activeDocument.addEventListener("click", (e) => {
       if (!pathWrapper.contains(e.target as Node)) {
         dropdown.hide();
       }
     });
 
-    setTimeout(() => pathInput.focus(), 50);
+    window.setTimeout(() => pathInput.focus(), 50);
   }
 
   onClose() {
@@ -1019,7 +1016,7 @@ class EditPathModal extends Modal {
     timeoutInput.addEventListener("keydown", handleKey);
     hintInput.addEventListener("keydown", handleKey);
 
-    setTimeout(() => labelInput.focus(), 50);
+    window.setTimeout(() => labelInput.focus(), 50);
   }
 
   onClose() {

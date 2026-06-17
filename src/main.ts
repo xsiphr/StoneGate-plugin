@@ -1,4 +1,4 @@
-import { Plugin, TFile } from "obsidian";
+import { Plugin } from "obsidian";
 import { StoneGateSettings } from "./types";
 import { DEFAULT_SETTINGS } from "./constants";
 import { LockManager } from "./lock-manager";
@@ -16,7 +16,9 @@ export default class StoneGatePlugin extends Plugin {
     await this.loadSettings();
 
     // Initialize overlay first
-    this.overlay = new LockOverlay(this.app, this.settings, () => this.saveSettings());
+    this.overlay = new LockOverlay(this.app, this.settings, async () => {
+      await this.saveSettings();
+    });
     this.lockManager = new LockManager(this.app, this.settings, this.overlay);
 
     const isLockedOut = this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil;
@@ -59,7 +61,7 @@ export default class StoneGatePlugin extends Plugin {
     this.addSettingTab(new StoneGateSettingTab(this.app, this));
 
     this.addCommand({
-      id: "stonegate-lock-vault",
+      id: "lock-vault",
       name: "Lock vault now",
       callback: () => {
         if (this.settings.enabled) {
@@ -77,7 +79,7 @@ export default class StoneGatePlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "stonegate-lock-folder",
+      id: "lock-folder",
       name: "Lock current folder",
       callback: () => {
         const file = this.app.workspace.getActiveFile();
@@ -92,7 +94,7 @@ export default class StoneGatePlugin extends Plugin {
     });
 
     this.addCommand({
-      id: "stonegate-unlock-path",
+      id: "unlock-path",
       name: "Unlock hidden/locked path",
       callback: () => {
         if (!this.settings.enabled) return;

@@ -1,4 +1,4 @@
-import { App, Modal, Notice, TFile } from "obsidian";
+import { App, Modal, Notice, TFile, setIcon } from "obsidian";
 import { StoneGateSettings, ProtectedPath } from "./types";
 import { verifyPassword } from "./crypto";
 
@@ -133,7 +133,7 @@ export class LockOverlay {
   }
 
   private createOverlay() {
-    this.containerEl = document.createElement("div");
+    this.containerEl = activeDocument.createElement("div");
     this.containerEl.addClass("sg-overlay-container", "sg-overlay-hidden");
 
     this.bgLayerEl = this.containerEl.createDiv("sg-background-layer");
@@ -150,15 +150,15 @@ export class LockOverlay {
     });
 
     const eyeToggle = inputWrapper.createEl("button", { cls: "sg-eye-toggle" });
-    eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+    setIcon(eyeToggle, "eye");
     eyeToggle.addEventListener("click", () => {
       if (!this.inputEl) return;
       const isPassword = this.inputEl.type === "password";
       this.inputEl.type = isPassword ? "text" : "password";
       if (isPassword) {
-        eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
+        setIcon(eyeToggle, "eye-off");
       } else {
-        eyeToggle.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+        setIcon(eyeToggle, "eye");
       }
     });
 
@@ -192,7 +192,7 @@ export class LockOverlay {
       e.stopPropagation();
     });
 
-    document.body.appendChild(this.containerEl);
+    activeDocument.body.appendChild(this.containerEl);
 
     // Tamper protection observer
     this.observer = new MutationObserver((mutations) => {
@@ -200,22 +200,22 @@ export class LockOverlay {
         if (mutation.type === "childList") {
           const removedNodes = Array.from(mutation.removedNodes);
           if (this.containerEl && removedNodes.includes(this.containerEl)) {
-            document.body.appendChild(this.containerEl);
+            activeDocument.body.appendChild(this.containerEl);
           }
         }
       });
     });
-    this.observer.observe(document.body, { childList: true });
+    this.observer.observe(activeDocument.body, { childList: true });
   }
 
   private handleKeydown(e: KeyboardEvent) {
     if (!this.containerEl || this.containerEl.hasClass("sg-overlay-hidden")) return;
     
-    const isRecoveryModalOpen = !!document.querySelector(".sg-recovery-modal-container");
-    const recoveryModal = document.querySelector(".sg-recovery-modal-container");
+    const isRecoveryModalOpen = !!activeDocument.querySelector(".sg-recovery-modal-container");
+    const recoveryModal = activeDocument.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal?.querySelector("input") as HTMLInputElement;
 
-    const activeEl = (typeof activeDocument !== "undefined" && activeDocument) ? activeDocument.activeElement : document.activeElement;
+    const activeEl = activeDocument.activeElement;
     const isFocusOnOurInput = (activeEl === this.inputEl) || (recoveryInput && activeEl === recoveryInput);
 
     const hasModifier = e.ctrlKey || e.metaKey || e.altKey;
@@ -296,7 +296,7 @@ export class LockOverlay {
     this.containerEl.addClass("sg-overlay-fade-in");
     
     // Disable workspace pointer events
-    const workspace = document.body.querySelector(".workspace") as HTMLElement;
+    const workspace = activeDocument.body.querySelector(".workspace") as HTMLElement;
     if (workspace) workspace.setCssStyles({ pointerEvents: "none" });
 
     // Block keyboard events
@@ -319,7 +319,7 @@ export class LockOverlay {
       if (this.settings.lockoutUntil && Date.now() < this.settings.lockoutUntil) {
         this.startLockoutTimer();
       } else {
-        setTimeout(() => this.inputEl?.focus(), 50);
+        window.setTimeout(() => this.inputEl?.focus(), 50);
       }
     }
   }
@@ -334,11 +334,11 @@ export class LockOverlay {
     this.containerEl.removeClass("sg-overlay-fade-in");
     this.containerEl.addClass("sg-overlay-fade-out");
 
-    setTimeout(() => {
+    window.setTimeout(() => {
       if (this.containerEl) {
         this.containerEl.addClass("sg-overlay-hidden");
       }
-      const workspace = document.body.querySelector(".workspace") as HTMLElement;
+      const workspace = activeDocument.body.querySelector(".workspace") as HTMLElement;
       if (workspace) workspace.setCssStyles({ pointerEvents: "" });
       window.removeEventListener("keydown", this.boundHandleKeydown, { capture: true });
     }, 300); // match animation duration
@@ -446,7 +446,7 @@ export class LockOverlay {
     } else {
       if (this.settings.lockoutUntil !== 0) {
         this.settings.lockoutUntil = 0;
-        this.saveSettings().catch(err => console.error("StoneGate: failed to save lockout settings", err));
+        void this.saveSettings().catch(err => console.error("StoneGate: failed to save lockout settings", err));
       }
       this.inputEl!.disabled = false;
       this.submitBtnEl!.disabled = false;
@@ -595,7 +595,7 @@ class RecoveryBypassModal extends Modal {
       this.close();
     });
 
-    setTimeout(() => input.focus(), 80);
+    window.setTimeout(() => input.focus(), 80);
   }
 
   onClose() {
