@@ -466,7 +466,23 @@ var LockOverlay = class {
   applyBackgroundStyles() {
     if (!this.containerEl || !this.bgLayerEl)
       return;
-    const resolvedUrl = this.resolveBackgroundUrl(this.settings.customBackgroundUrl);
+    const bgUrlSetting = this.settings.customBackgroundUrl;
+    if (!bgUrlSetting) {
+      this.bgLayerEl.style.backgroundImage = "";
+      this.bgLayerEl.style.backgroundSize = "";
+      this.bgLayerEl.style.backgroundPosition = "";
+      this.bgLayerEl.style.filter = "";
+      this.bgLayerEl.style.transform = "";
+      this.bgLayerEl.style.setProperty("-webkit-transform", "");
+      return;
+    }
+    let resolvedUrl = "";
+    try {
+      resolvedUrl = this.resolveBackgroundUrl(bgUrlSetting);
+    } catch (e) {
+      console.warn("StoneGate: Background url resolution threw error:", e);
+    }
+    console.log("StoneGate: Applying background from:", resolvedUrl);
     if (resolvedUrl) {
       this.bgLayerEl.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65)), url('${resolvedUrl}')`;
       this.bgLayerEl.style.backgroundSize = "cover";
@@ -550,7 +566,9 @@ var LockOverlay = class {
     const recoveryModal = document.querySelector(".sg-recovery-modal-container");
     const recoveryInput = recoveryModal == null ? void 0 : recoveryModal.querySelector("input");
     if (recoveryInput && document.activeElement === recoveryInput) {
-      e.stopPropagation();
+      if (e.key !== "Enter") {
+        e.stopPropagation();
+      }
       return;
     }
     e.stopPropagation();
@@ -571,7 +589,6 @@ var LockOverlay = class {
   show(path, previousFile, callback) {
     if (!this.containerEl)
       return;
-    this.applyBackgroundStyles();
     this.currentPath = path;
     this.previousFile = previousFile;
     this.currentCallback = callback;
@@ -596,6 +613,13 @@ var LockOverlay = class {
     if (workspace)
       workspace.style.pointerEvents = "none";
     document.addEventListener("keydown", this.boundHandleKeydown, true);
+    if (this.app.workspace.layoutReady) {
+      this.applyBackgroundStyles();
+    } else {
+      this.app.workspace.onLayoutReady(() => {
+        this.applyBackgroundStyles();
+      });
+    }
     if (this.inputEl) {
       this.inputEl.value = "";
       this.errorEl.textContent = "";
@@ -855,6 +879,7 @@ var RecoveryBypassModal = class extends import_obsidian.Modal {
     input.addEventListener("keydown", (e) => {
       if (e.key === "Enter") {
         e.preventDefault();
+        e.stopPropagation();
         attempt();
       }
     });
@@ -1063,12 +1088,13 @@ var StoneGateSettingTab = class extends import_obsidian2.PluginSettingTab {
         await this.plugin.saveSettings();
       })
     );
-    new import_obsidian2.Setting(containerEl).setName("Custom Background URL/Path").setDesc("URL or local path to a custom background image. You can copy an Obsidian URL using the 'Copy Obsidian URL' feature (starts with app://obsidian.md/...).").addText(
-      (text) => text.setPlaceholder("https://example.com/image.jpg").setValue(this.plugin.settings.customBackgroundUrl || "").onChange(async (value) => {
+    new import_obsidian2.Setting(containerEl).setName("Custom Background URL/Path").setDesc("URL or local path to a custom background image. You can use an external URL (http/https), or a local file from the vault (simply type the file name or use the path in the vault).").addText((text) => {
+      text.setPlaceholder("https://example.com/image.jpg").setValue(this.plugin.settings.customBackgroundUrl || "").onChange(async (value) => {
         this.plugin.settings.customBackgroundUrl = value.trim();
         await this.plugin.saveSettings();
-      })
-    );
+      });
+      new ImagePathSuggest(this.app, text.inputEl);
+    });
     containerEl.createEl("h3", { text: "Ghost Mode & Commands" });
     const unlockMenuPwdSetting = new import_obsidian2.Setting(containerEl).setName("Unlock Menu Access Password").setDesc("Used to access the command palette list of hidden/locked paths");
     if (this.plugin.settings.unlockMenuPasswordHash) {
@@ -1444,6 +1470,37 @@ var AddPathModal = class extends import_obsidian2.Modal {
     const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
     ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    menuWrapper.style.display = "flex";
+    menuWrapper.style.flexDirection = "row";
+    menuWrapper.style.alignItems = "center";
+    menuWrapper.style.justifyContent = "flex-start";
+    menuWrapper.style.gap = "8px";
+    menuWrapper.style.marginBottom = "16px";
+    const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
+    menuToggle.style.flexShrink = "0";
+    const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
+    menuLabel.style.cursor = "pointer";
+    menuLabel.addEventListener("click", () => {
+      if (!menuToggle.disabled) {
+        menuToggle.click();
+      }
+    });
+    const menuDesc = contentEl.createEl("p", {
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+    });
+    menuDesc.style.fontSize = "0.85em";
+    menuDesc.style.color = "var(--text-muted)";
+    menuDesc.style.marginTop = "-12px";
+    menuDesc.style.marginBottom = "16px";
+    ghostToggle.addEventListener("change", () => {
+      if (ghostToggle.checked) {
+        menuToggle.checked = true;
+        menuToggle.disabled = true;
+      } else {
+        menuToggle.disabled = false;
+      }
+    });
     let tempHash = void 0;
     let tempSalt = void 0;
     const pwdBtn = contentEl.createEl("button", { text: "Set Password for this path (optional)" });
@@ -1486,7 +1543,8 @@ var AddPathModal = class extends import_obsidian2.Modal {
         passwordSalt: tempSalt,
         passwordHint: hintInput.value.trim() || void 0,
         showHint: showHintToggle.checked,
-        enableGhostMode: ghostToggle.checked
+        enableGhostMode: ghostToggle.checked,
+        showInUnlockMenu: menuToggle.checked
       });
       await this.plugin.saveSettings();
       this.onSubmit(true);
@@ -1568,6 +1626,42 @@ var EditPathModal = class extends import_obsidian2.Modal {
     const ghostLabel = ghostWrapper.createEl("span", { text: "Enable Ghost Mode (Hide this path from File Explorer)" });
     ghostLabel.style.cursor = "pointer";
     ghostLabel.addEventListener("click", () => ghostToggle.click());
+    const menuWrapper = contentEl.createDiv({ cls: "sg-modal-input-container" });
+    menuWrapper.style.display = "flex";
+    menuWrapper.style.flexDirection = "row";
+    menuWrapper.style.alignItems = "center";
+    menuWrapper.style.justifyContent = "flex-start";
+    menuWrapper.style.gap = "8px";
+    menuWrapper.style.marginBottom = "16px";
+    const menuToggle = menuWrapper.createEl("input", { type: "checkbox" });
+    menuToggle.style.flexShrink = "0";
+    menuToggle.checked = !!this.pathObj.showInUnlockMenu;
+    const menuLabel = menuWrapper.createEl("span", { text: "Show in Unlock Menu" });
+    menuLabel.style.cursor = "pointer";
+    menuLabel.addEventListener("click", () => {
+      if (!menuToggle.disabled) {
+        menuToggle.click();
+      }
+    });
+    const menuDesc = contentEl.createEl("p", {
+      text: "If enabled, this path will be listed in the Unlock Menu. Note: Paths with Ghost Mode enabled are ALWAYS listed."
+    });
+    menuDesc.style.fontSize = "0.85em";
+    menuDesc.style.color = "var(--text-muted)";
+    menuDesc.style.marginTop = "-12px";
+    menuDesc.style.marginBottom = "16px";
+    if (ghostToggle.checked) {
+      menuToggle.checked = true;
+      menuToggle.disabled = true;
+    }
+    ghostToggle.addEventListener("change", () => {
+      if (ghostToggle.checked) {
+        menuToggle.checked = true;
+        menuToggle.disabled = true;
+      } else {
+        menuToggle.disabled = false;
+      }
+    });
     const pwdControls = contentEl.createDiv();
     pwdControls.style.display = "flex";
     pwdControls.style.gap = "8px";
@@ -1618,6 +1712,7 @@ var EditPathModal = class extends import_obsidian2.Modal {
       this.pathObj.passwordHint = hintInput.value.trim() || void 0;
       this.pathObj.showHint = showHintToggle.checked;
       this.pathObj.enableGhostMode = ghostToggle.checked;
+      this.pathObj.showInUnlockMenu = menuToggle.checked;
       await this.plugin.saveSettings();
       this.plugin.lockManager.updateGhostModeStyles();
       this.onSubmit(true);
@@ -1640,6 +1735,31 @@ var EditPathModal = class extends import_obsidian2.Modal {
     this.contentEl.empty();
   }
 };
+var ImagePathSuggest = class extends import_obsidian2.AbstractInputSuggest {
+  constructor(app, inputEl) {
+    super(app, inputEl);
+    this.inputEl = inputEl;
+  }
+  getSuggestions(query) {
+    const files = this.app.vault.getFiles();
+    const extensions = ["png", "jpg", "jpeg", "gif", "svg", "webp"];
+    const lowerQuery = query.toLowerCase();
+    return files.filter((file) => {
+      const ext = file.extension.toLowerCase();
+      const matchesExtension = extensions.includes(ext);
+      const matchesQuery = file.path.toLowerCase().contains(lowerQuery);
+      return matchesExtension && matchesQuery;
+    }).map((file) => file.path);
+  }
+  renderSuggestion(value, el) {
+    el.setText(value);
+  }
+  selectSuggestion(value, evt) {
+    this.setValue(value);
+    this.inputEl.dispatchEvent(new Event("input"));
+    this.close();
+  }
+};
 
 // src/unlock-path-modal.ts
 var import_obsidian3 = require("obsidian");
@@ -1650,7 +1770,9 @@ var UnlockPathModal = class extends import_obsidian3.FuzzySuggestModal {
     this.setPlaceholder("Search for a locked path to unlock...");
   }
   getItems() {
-    return this.plugin.settings.protectedPaths.filter((p) => this.plugin.lockManager.isLocked(p.path));
+    return this.plugin.settings.protectedPaths.filter(
+      (p) => this.plugin.lockManager.isLocked(p.path) && (p.enableGhostMode === true || p.showInUnlockMenu === true)
+    );
   }
   getItemText(item) {
     return item.label ? `${item.label} (${item.path})` : item.path;
