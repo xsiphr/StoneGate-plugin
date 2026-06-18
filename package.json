@@ -1,6 +1,6 @@
 {
   "name": "stonegate",
-  "version": "2.0.3",
+  "version": "2.0.4",
   "description": "Lock screen protection for your vault",
   "main": "main.js",
   "scripts": {
