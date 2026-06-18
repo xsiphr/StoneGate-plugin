@@ -7,7 +7,8 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-2.0.0-blueviolet" alt="Version">
+  <img src="https://img.shields.io/github/stars/xsiphr/StoneGate-plugin?style=flat&color=yellow" alt="Stars">
+  <img src="https://img.shields.io/badge/version-2.0.4-blueviolet" alt="Version">
   <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
   <img src="https://img.shields.io/badge/platform-desktop%20%7C%20mobile-informational" alt="Platform">
 </p>
