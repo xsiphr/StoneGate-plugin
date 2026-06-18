@@ -73,4 +73,4 @@ Configure these under **Settings → Hotkeys**:
 
 MIT — see [LICENSE](LICENSE).
 
-Built by [Abdulrahman Agiba (xsiphr)](https://github.com/xsiphr).
+Built by [Abdulrahman Agiba | xsiphr](https://github.com/xsiphr).
