@@ -327,7 +327,7 @@ export class LockOverlay {
       const htmlModal = modal as HTMLElement;
       if (htmlModal.style.display !== "none") {
         htmlModal.setAttribute("data-sg-original-display", htmlModal.style.display || "block");
-        htmlModal.style.display = "none";
+        htmlModal.setCssStyles({ display: "none" });
       }
     });
 
@@ -373,7 +373,7 @@ export class LockOverlay {
       const htmlModal = modal as HTMLElement;
       const originalDisplay = htmlModal.getAttribute("data-sg-original-display");
       if (originalDisplay) {
-        htmlModal.style.display = originalDisplay === "block" ? "" : originalDisplay;
+        htmlModal.setCssStyles({ display: originalDisplay === "block" ? "" : originalDisplay });
         htmlModal.removeAttribute("data-sg-original-display");
       }
     });
