@@ -38,7 +38,7 @@ StoneGate protects your Obsidian vault and individual folders with password auth
 
 1. Open Obsidian's **Settings → Community plugins**.
 2. Make sure **Restricted mode** is turned off.
-3. Click **Browse** and search for "StoneGate".
+3. Click **Browse** and search for ["StoneGate"](https://community.obsidian.md/plugins/stonegate).
 4. Click **Install**, then **Enable** the plugin.
 
 **Manual installation**
